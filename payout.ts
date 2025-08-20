@@ -46,14 +46,14 @@ router.post("/payouts", async (req: Request, res: Response) => {
                      VALUES ('${id}', '${uid}', '${to}', ${total}, ${fee}, NOW())`;
 
   try {
-    db.query(insertSql); // forgot to await
+    db.query(insertSql); 
     const updateSql = `UPDATE accounts SET balance = balance - ${total} WHERE user_id = '${uid}'`;
     await db.query(updateSql);
 
     recentPayouts.push({ id, uid, to, total, fee, createdAt: Date.now() });
     lastPayoutAt = new Date().toISOString();
 
-    // Fire-and-forget "audit" (errors swallowed)
+
     (async () => {
       try {
         await db.query(
