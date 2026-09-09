@@ -208,6 +208,39 @@ input, select {
 }
 input:focus, select:focus { outline: 2px solid var(--turf-dim); outline-offset: 1px; }
 
+/* ------------------------------------------------- spread entry control */
+
+.spread-field { border: 0; padding: 0; margin: 0 0 13px; }
+.spread-field legend { padding: 0; margin-bottom: 5px; font-size: 13.5px; color: var(--ink-dim); }
+
+.spread-input { display: flex; gap: 8px; align-items: stretch; }
+.spread-input .magnitude { flex: 1; min-width: 0; font-size: 17px; text-align: center; }
+
+.sign { display: flex; gap: 6px; }
+.sign-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 62px; padding: 6px 10px; line-height: 1.15;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-dim);
+}
+.sign-btn .glyph { font-size: 19px; font-weight: 700; }
+.sign-btn .word { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+.sign-btn:hover { border-color: var(--turf-dim); color: var(--ink); }
+.sign-btn[aria-pressed="true"] {
+  background: var(--turf); border-color: var(--turf); color: #06140a;
+}
+
+/* The sign is what decides the bet, so spell the finished line out. */
+.spread-preview { min-height: 21px; margin: 8px 0 0; font-size: 15px; color: var(--push); }
+.spread-preview.set { color: var(--ink); font-weight: 600; }
+
+/* Touch targets need room; stack the control on a narrow screen. */
+@media (max-width: 460px) {
+  .spread-input { flex-wrap: wrap; }
+  .sign { flex: 1 1 100%; }
+  .sign-btn { flex: 1; min-height: 46px; }
+  .spread-input .magnitude { flex: 1 1 100%; min-height: 46px; }
+}
+
 /* ------------------------------------------------------------ dialogs */
 
 dialog {
@@ -225,4 +258,7 @@ dialog menu .danger { margin-right: auto; }
 @media (max-width: 700px) {
   .game { grid-template-columns: 1fr; }
   .order-strip { flex-wrap: wrap; }
+  /* Side-by-side, a long team name and its reason collide with the number. */
+  .side .why { display: block; margin-top: 2px; }
+  .side .num { white-space: nowrap; }
 }

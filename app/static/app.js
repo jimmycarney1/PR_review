@@ -234,9 +234,69 @@ function gameRow(game, board) {
   return row;
 }
 
+/* -------------------------------------------------------- spread input */
+/* A mobile decimal keypad has no minus key, so the sign is its own control
+   and the number field only ever holds a magnitude. The preview spells the
+   whole line out, since the sign is what decides the bet. */
+
+function spreadControl(root, teamOf) {
+  const buttons = [...root.querySelectorAll(".sign-btn")];
+  const magnitude = root.querySelector(".magnitude");
+  const preview = root.querySelector(".spread-preview");
+
+  const signed = () => {
+    const chosen = buttons.find((b) => b.getAttribute("aria-pressed") === "true");
+    const points = Number(magnitude.value);
+    if (!chosen || magnitude.value === "" || Number.isNaN(points)) return null;
+    // A pick'em has no side to it, so don't let the sign make 0 look signed.
+    return points === 0 ? 0 : points * Number(chosen.dataset.sign);
+  };
+
+  const paint = () => {
+    const value = signed();
+    preview.textContent =
+      value === null ? "" : `${teamOf()} ${formatSpread(value)}`;
+    preview.classList.toggle("set", value !== null);
+  };
+
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      buttons.forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+      paint();
+    });
+  });
+  magnitude.addEventListener("input", paint);
+
+  return {
+    value: signed,
+    repaint: paint,
+    set(spread) {
+      const sign = spread < 0 ? "-1" : "1";
+      buttons.forEach((b) =>
+        b.setAttribute("aria-pressed", String(b.dataset.sign === sign))
+      );
+      magnitude.value = spread === null || spread === undefined ? "" : Math.abs(spread);
+      paint();
+    },
+    clear() {
+      buttons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+      magnitude.value = "";
+      paint();
+    },
+    focus: () => magnitude.focus(),
+  };
+}
+
+// Mirrors rules.format_spread on the server.
+function formatSpread(spread) {
+  if (spread === 0) return "PK";
+  return `${spread > 0 ? "+" : "-"}${Math.abs(spread)}`;
+}
+
 /* ----------------------------------------------------------- pick flow */
 
 let pending = null;
+let pickSpread = null;
 
 function openPick(game, side, forceOverride) {
   pending = { game, side, override: forceOverride };
@@ -248,10 +308,13 @@ function openPick(game, side, forceOverride) {
 
   const fields = $("#override-fields");
   fields.hidden = !forceOverride;
-  fields.querySelector("[name=override_spread]").required = !!forceOverride;
   fields.querySelector("[name=override_reason]").required = !!forceOverride;
   $("#pick-form").reset();
+
+  pickSpread ??= spreadControl(fields, () => pending?.side.team ?? "");
+  pickSpread.clear();
   $("#pick-dialog").showModal();
+  if (forceOverride) pickSpread.focus();
 }
 
 $("#pick-form").addEventListener("submit", async (event) => {
@@ -264,7 +327,13 @@ $("#pick-form").addEventListener("submit", async (event) => {
     team: pending.side.team,
   };
   if (pending.override) {
-    payload.override_spread = Number(data.get("override_spread"));
+    const spread = pickSpread.value();
+    if (spread === null) {
+      say("Pick a side of the line and enter the points.", "error", true);
+      pending = null;
+      return;
+    }
+    payload.override_spread = spread;
     payload.override_reason = data.get("override_reason");
   }
   try {
@@ -287,6 +356,7 @@ $("#pick-form").addEventListener("submit", async (event) => {
 /* ----------------------------------------------------------- edit flow */
 
 let editing = null;
+let editSpread = null;
 
 function openEdit(pick) {
   editing = pick;
@@ -305,7 +375,16 @@ function openEdit(pick) {
   state.board.players.forEach((p) => actor.append(new Option(p, p)));
   actor.value = pick.player;
 
-  form.querySelector("[name=spread]").value = pick.spread;
+  if (!editSpread) {
+    editSpread = spreadControl(
+      form.querySelector(".spread-field"),
+      () => form.querySelector("[name=team]").value
+    );
+    // Flipping the side changes what the line reads as. Bound once, with the
+    // control, so reopening the dialog doesn't stack listeners.
+    teams.addEventListener("change", editSpread.repaint);
+  }
+  editSpread.set(pick.spread);
   $("#edit-delete").hidden = pick.slot !== Math.max(...state.board.picks.map((p) => p.slot));
   $("#edit-dialog").showModal();
 }
@@ -325,7 +404,13 @@ $("#edit-form").addEventListener("submit", async (event) => {
       });
       say(`Removed ${editing.label}. It stays in the ledger.`, "ok");
     } else {
-      const body = { team: data.get("team"), spread: Number(data.get("spread")), actor, reason };
+      const spread = editSpread.value();
+      if (spread === null) {
+        say("Pick a side of the line and enter the points.", "error", true);
+        editing = null;
+        return;
+      }
+      const body = { team: data.get("team"), spread, actor, reason };
       const out = await api(`/api/picks/${editing.id}`, { method: "PATCH", body: JSON.stringify(body) });
       say(
         out.changed.length

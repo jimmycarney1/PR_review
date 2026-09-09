@@ -84,12 +84,28 @@
   <form method="dialog" id="pick-form">
     <h3 id="pick-title">Confirm pick</h3>
     <p id="pick-detail" class="dialog-detail"></p>
-    <label id="override-fields" hidden>
-      <span>Line (e.g. <code>-3.5</code>, <code>+7</code>)</span>
-      <input name="override_spread" type="number" step="0.5" inputmode="decimal">
-      <span>Why is this being entered by hand?</span>
-      <input name="override_reason" placeholder="Out of API credits">
-    </label>
+    <div id="override-fields" hidden>
+      <fieldset class="spread-field">
+        <legend>Line</legend>
+        <div class="spread-input">
+          <div class="sign" role="group" aria-label="Getting points or laying them">
+            <button type="button" class="sign-btn" data-sign="1" aria-pressed="false">
+              <span class="glyph">+</span><span class="word">dog</span>
+            </button>
+            <button type="button" class="sign-btn" data-sign="-1" aria-pressed="false">
+              <span class="glyph">−</span><span class="word">favorite</span>
+            </button>
+          </div>
+          <input class="magnitude" name="magnitude" type="number" min="0" step="0.5"
+                 inputmode="decimal" placeholder="3.5" aria-label="Points">
+        </div>
+        <p class="spread-preview" aria-live="polite"></p>
+      </fieldset>
+      <label>
+        <span>Why is this being entered by hand?</span>
+        <input name="override_reason" placeholder="Out of API credits">
+      </label>
+    </div>
     <menu>
       <button value="cancel" class="ghost">Cancel</button>
       <button value="confirm" class="primary">Lock it in</button>
@@ -106,10 +122,22 @@
       <span>Side</span>
       <select name="team"></select>
     </label>
-    <label>
-      <span>Line</span>
-      <input name="spread" type="number" step="0.5" inputmode="decimal" required>
-    </label>
+    <fieldset class="spread-field">
+      <legend>Line</legend>
+      <div class="spread-input">
+        <div class="sign" role="group" aria-label="Getting points or laying them">
+          <button type="button" class="sign-btn" data-sign="1" aria-pressed="false">
+            <span class="glyph">+</span><span class="word">dog</span>
+          </button>
+          <button type="button" class="sign-btn" data-sign="-1" aria-pressed="false">
+            <span class="glyph">−</span><span class="word">favorite</span>
+          </button>
+        </div>
+        <input class="magnitude" name="magnitude" type="number" min="0" step="0.5"
+               inputmode="decimal" required aria-label="Points">
+      </div>
+      <p class="spread-preview" aria-live="polite"></p>
+    </fieldset>
     <label>
       <span>Who's making this edit?</span>
       <select name="actor"></select>

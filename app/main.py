@@ -174,7 +174,7 @@ def board(week: int = 1, conn=Depends(db)):
             elif game["id"] in own_games:
                 reason = "You already have the other side"
             elif line is None:
-                reason = "No line -- needs a refresh or a manual override"
+                reason = "No line yet — refresh, or enter one by hand"
             sides.append(
                 {
                     "team": team,
