@@ -79,6 +79,37 @@ weeks in 7-day blocks from it, so a Thursday-through-Monday slate lands in one
 week. **Check this before week 1**: the default (`2026-09-08`) is a guess at the
 2026 opener. If your slate shows up under the wrong week, move the anchor.
 
+## Deploying to Railway
+
+Railway builds this with Nixpacks off `requirements.txt`; `railway.toml` supplies
+the start command and a health check at `/api/health`.
+
+**Add a volume first.** Railway container disks are ephemeral — without one, the
+whole season is wiped on every redeploy.
+
+1. Create the service from this repo.
+2. Add a **Volume** to the service, mount path `/data`.
+3. Set the service variables:
+
+   | Variable | Value |
+   | -------- | ----- |
+   | `PIGSKIN_DB` | `/data/pigskin.db` |
+   | `ODDS_API_KEY` | your key |
+   | `SEASON_WEEK1_ANCHOR` | the Tuesday opening week 1 |
+
+4. Deploy, then generate a public domain under Settings → Networking.
+
+`$PORT` is injected by Railway and read by the start command; nothing else needs
+configuring. Keep it at one replica — SQLite takes a single writer, and three
+players don't need more.
+
+To back up a season, `railway run sqlite3 /data/pigskin.db .dump > backup.sql`.
+
+**Note on access.** There's no login, as discussed. On a public Railway URL that
+means anyone with the link can make and edit picks — every change is attributed
+and ledgered, but nothing stops it. Fine if you keep the URL between the three of
+you; if you'd rather not rely on that, a shared passcode is a small addition.
+
 ## Layout
 
 ```

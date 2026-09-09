@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import odds, rules
-from .db import connect, init_db, now_iso
+from .db import DB_PATH, connect, init_db, now_iso
 
 STATIC_DIR = Path(__file__).parent / "static"
 SEASON_ANCHOR = os.environ.get("SEASON_WEEK1_ANCHOR", "2026-09-08")
@@ -126,6 +126,13 @@ def _log(conn, pick_id, week, player, action, actor, *, field=None, old=None, ne
 
 def _pick_error(exc: rules.PickError) -> HTTPException:
     return HTTPException(409, {"code": exc.code, "message": exc.message})
+
+
+@app.get("/api/health")
+def health(conn=Depends(db)):
+    """Readiness probe -- confirms the process is up and the database answers."""
+    conn.execute("SELECT 1").fetchone()
+    return {"status": "ok", "database": DB_PATH}
 
 
 # ---------------------------------------------------------------- board

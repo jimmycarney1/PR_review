@@ -2,6 +2,7 @@
 import os
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 
 DB_PATH = os.environ.get("PIGSKIN_DB", "pigskin.db")
 
@@ -106,6 +107,11 @@ def connect(path: str | None = None) -> sqlite3.Connection:
 
 
 def init_db(path: str | None = None) -> None:
+    # On a host like Railway the database lives on a mounted volume, so make
+    # sure the directory exists before SQLite tries to open a file in it.
+    parent = Path(path or DB_PATH).parent
+    if str(parent) not in ("", "."):
+        parent.mkdir(parents=True, exist_ok=True)
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
