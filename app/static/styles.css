@@ -15,6 +15,10 @@
 
 * { box-sizing: border-box; }
 
+/* An author `display` beats the browser's [hidden] rule, so pin it down --
+   several controls here are shown and hidden by the hidden attribute. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -207,6 +211,14 @@ input, select {
   border-radius: 8px; padding: 8px 10px; font: inherit;
 }
 input:focus, select:focus { outline: 2px solid var(--turf-dim); outline-offset: 1px; }
+
+/* A quiet way out of the book's number, without competing with "Lock it in". */
+.linkish {
+  display: block; width: 100%; margin: 0 0 14px; padding: 10px;
+  background: none; border: 1px dashed var(--line); color: var(--ink-dim);
+  font-size: 13.5px; min-height: 42px;
+}
+.linkish:hover { border-color: var(--gold); color: var(--gold); }
 
 /* ------------------------------------------------- spread entry control */
 

@@ -307,15 +307,38 @@ function openPick(game, side, forceOverride) {
     (forceOverride ? "no line on file — enter it below" : `${side.team} ${side.display}`);
 
   const fields = $("#override-fields");
-  fields.hidden = !forceOverride;
-  fields.querySelector("[name=override_reason]").required = !!forceOverride;
   $("#pick-form").reset();
-
   pickSpread ??= spreadControl(fields, () => pending?.side.team ?? "");
-  pickSpread.clear();
+
+  // With no line on file the hand-entry is the only way through, so it starts
+  // open. With a line it stays one tap away -- the book can be wrong, or the
+  // three of you may have agreed on a different number.
+  fields.hidden = !forceOverride;
+  $("#override-toggle").hidden = forceOverride;
+  fields.querySelector("[name=override_reason]").required = !!forceOverride;
+
+  if (forceOverride) {
+    pickSpread.clear();
+  } else {
+    // Seed with the book's number so a tweak is an edit, not a re-type.
+    pickSpread.set(side.spread);
+  }
+
   $("#pick-dialog").showModal();
   if (forceOverride) pickSpread.focus();
 }
+
+$("#override-toggle").addEventListener("click", () => {
+  if (!pending) return;
+  pending.override = true;
+  const fields = $("#override-fields");
+  fields.hidden = false;
+  fields.querySelector("[name=override_reason]").required = true;
+  $("#override-toggle").hidden = true;
+  $("#pick-detail").textContent =
+    `${pending.game.away_team} @ ${pending.game.home_team} · entering the line by hand`;
+  pickSpread.focus();
+});
 
 $("#pick-form").addEventListener("submit", async (event) => {
   if (event.submitter?.value !== "confirm" || !pending) return;
