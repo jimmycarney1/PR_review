@@ -1,0 +1,276 @@
+:root {
+  --bg: #0f1418;
+  --panel: #172026;
+  --panel-2: #1e2a32;
+  --line: #2a3a44;
+  --ink: #e8eef2;
+  --ink-dim: #9aacb8;
+  --turf: #3fa34d;
+  --turf-dim: #2c7538;
+  --gold: #e0b341;
+  --loss: #d05c5c;
+  --push: #7f8fa0;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+/* An author `display` beats the browser's [hidden] rule, so pin it down --
+   several controls here are shown and hidden by the hidden attribute. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- chrome */
+
+.topbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #1b262d, #141d22);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand h1 { font-size: 19px; margin: 0; letter-spacing: .2px; }
+.ball { font-size: 22px; }
+
+.weekpick { display: flex; align-items: center; gap: 4px; }
+.weekpick select {
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 7px 10px; font: inherit; min-width: 104px;
+}
+
+.credits { font-size: 12.5px; color: var(--ink-dim); text-align: right; }
+.credits strong { color: var(--ink); }
+.credits.low strong { color: var(--gold); }
+
+.tabs { display: flex; gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.tab {
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--ink-dim); font: inherit; padding: 11px 15px; cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--ink); border-bottom-color: var(--turf); }
+
+main { padding: 20px; max-width: 1060px; margin: 0 auto; }
+.section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-dim); margin: 26px 0 10px; }
+
+/* ------------------------------------------------------------ buttons */
+
+button { font: inherit; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.primary { background: var(--turf); color: #06140a; border-color: var(--turf); padding: 8px 15px; font-weight: 600; }
+.primary:hover { background: #49b958; }
+.secondary { background: var(--panel-2); color: var(--ink); border-color: var(--line); padding: 8px 14px; }
+.secondary:hover { border-color: var(--turf); }
+.ghost { background: none; color: var(--ink-dim); border-color: var(--line); padding: 7px 11px; }
+.ghost:hover { color: var(--ink); }
+.danger { background: none; color: var(--loss); border-color: var(--loss); padding: 8px 14px; }
+.danger:hover { background: rgba(208, 92, 92, .12); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* -------------------------------------------------------------- alert */
+
+.alert {
+  padding: 11px 14px; border-radius: var(--radius); margin-bottom: 16px;
+  background: rgba(224, 179, 65, .12); border: 1px solid var(--gold); color: #f3ddab;
+}
+.alert.error { background: rgba(208, 92, 92, .12); border-color: var(--loss); color: #f0c0c0; }
+.alert.ok { background: rgba(63, 163, 77, .12); border-color: var(--turf); color: #bfe6c6; }
+
+/* ------------------------------------------------------- lines status */
+
+.linebar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 15px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.freshness { font-size: 13.5px; color: var(--ink-dim); margin-right: auto; }
+.freshness .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 7px; background: var(--push); }
+.freshness.fresh .dot { background: var(--turf); }
+.freshness.stale .dot { background: var(--loss); }
+.freshness.stale { color: #f0c0c0; }
+
+.clock {
+  margin: 18px 0 6px; padding: 15px 18px; border-radius: var(--radius);
+  background: linear-gradient(90deg, rgba(63,163,77,.16), transparent);
+  border: 1px solid var(--turf-dim);
+}
+.clock .who { font-size: 21px; font-weight: 650; }
+.clock .sub { color: var(--ink-dim); font-size: 13px; }
+.clock.done { background: var(--panel); border-color: var(--line); }
+
+/* -------------------------------------------------------- draft order */
+
+.order-strip { display: flex; gap: 8px; list-style: none; padding: 0; margin: 14px 0 0;
+  overflow-x: auto; }
+.order-strip li {
+  flex: 1 1 0; min-width: 150px; padding: 9px 11px; border-radius: var(--radius);
+  background: var(--panel); border: 1px solid var(--line);
+}
+.order-strip li.current { border-color: var(--turf); background: var(--panel-2); }
+.order-strip .slot { font-size: 11px; color: var(--ink-dim); letter-spacing: .06em; }
+.order-strip .name { font-weight: 600; }
+.order-strip .made { font-size: 13px; margin-top: 3px; }
+.order-strip .made button {
+  background: none; border: 0; padding: 0; color: var(--ink);
+  font: inherit; text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.order-strip .empty { font-size: 13px; color: var(--push); margin-top: 3px; }
+.order-strip .flag { font-size: 11px; color: var(--gold); }
+
+/* -------------------------------------------------------------- board */
+
+.games { display: grid; gap: 10px; }
+.game {
+  display: grid; grid-template-columns: 150px 1fr 1fr; gap: 10px; align-items: center;
+  padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.game .kickoff { font-size: 12.5px; color: var(--ink-dim); }
+.game .kickoff .final { color: var(--ink); display: block; margin-top: 2px; }
+
+.remove-game {
+  display: block; margin-top: 6px; padding: 0 6px; line-height: 1.4;
+  background: none; border: 1px solid var(--line); color: var(--push); font-size: 13px;
+}
+.remove-game:hover { border-color: var(--loss); color: var(--loss); }
+
+.side {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  width: 100%; text-align: left; padding: 10px 13px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+}
+.side:hover:not(:disabled) { border-color: var(--turf); background: #24333c; }
+.side .team { font-weight: 560; }
+.side .num { font-variant-numeric: tabular-nums; font-weight: 650; }
+.side .why { font-size: 11.5px; color: var(--push); font-weight: 400; }
+.side:disabled { opacity: .55; }
+.side.taken { border-style: dashed; }
+
+/* ------------------------------------------------------------ results */
+
+.results { display: grid; gap: 10px; margin-top: 16px; }
+.result-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 14px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.result-row .matchup { font-weight: 560; }
+.result-row .picks { font-size: 13px; color: var(--ink-dim); margin-top: 4px; }
+.score-form { display: flex; align-items: center; gap: 6px; }
+.score-form input { width: 58px; text-align: center; }
+
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px;
+  font-weight: 650; letter-spacing: .04em; }
+.pill.WIN { background: rgba(63,163,77,.2); color: #7fd68d; }
+.pill.LOSS { background: rgba(208,92,92,.18); color: #eb9a9a; }
+.pill.PUSH { background: rgba(127,143,160,.2); color: #b7c4cf; }
+
+/* ---------------------------------------------------- tables & ledger */
+
+table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-dim); }
+td.num { font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--panel); }
+.leader td { color: var(--gold); font-weight: 600; }
+
+.ledger-entry {
+  display: grid; grid-template-columns: 116px 1fr; gap: 12px;
+  padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.ledger-entry .when { color: var(--ink-dim); font-size: 12px; }
+.ledger-entry .what .action { font-weight: 620; }
+.ledger-entry .what .reason { color: var(--ink-dim); font-size: 13px; }
+.ledger-entry .arrow { color: var(--gold); }
+
+/* ------------------------------------------------------------- forms */
+
+.hint { color: var(--ink-dim); font-size: 13px; margin: 0; }
+.manual-game { margin-top: 22px; padding: 12px 14px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); }
+.manual-game summary { cursor: pointer; color: var(--ink-dim); }
+.manual-game summary:hover { color: var(--ink); }
+.row-form { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.row-form .at { color: var(--ink-dim); }
+
+input, select {
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; font: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--turf-dim); outline-offset: 1px; }
+
+/* A quiet way out of the book's number, without competing with "Lock it in". */
+.linkish {
+  display: block; width: 100%; margin: 0 0 14px; padding: 10px;
+  background: none; border: 1px dashed var(--line); color: var(--ink-dim);
+  font-size: 13.5px; min-height: 42px;
+}
+.linkish:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ------------------------------------------------- spread entry control */
+
+.spread-field { border: 0; padding: 0; margin: 0 0 13px; }
+.spread-field legend { padding: 0; margin-bottom: 5px; font-size: 13.5px; color: var(--ink-dim); }
+
+.spread-input { display: flex; gap: 8px; align-items: stretch; }
+.spread-input .magnitude { flex: 1; min-width: 0; font-size: 17px; text-align: center; }
+
+.sign { display: flex; gap: 6px; }
+.sign-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 62px; padding: 6px 10px; line-height: 1.15;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-dim);
+}
+.sign-btn .glyph { font-size: 19px; font-weight: 700; }
+.sign-btn .word { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+.sign-btn:hover { border-color: var(--turf-dim); color: var(--ink); }
+.sign-btn[aria-pressed="true"] {
+  background: var(--turf); border-color: var(--turf); color: #06140a;
+}
+
+/* The sign is what decides the bet, so spell the finished line out. */
+.spread-preview { min-height: 21px; margin: 8px 0 0; font-size: 15px; color: var(--push); }
+.spread-preview.set { color: var(--ink); font-weight: 600; }
+
+/* Touch targets need room; stack the control on a narrow screen. */
+@media (max-width: 460px) {
+  .spread-input { flex-wrap: wrap; }
+  .sign { flex: 1 1 100%; }
+  .sign-btn { flex: 1; min-height: 46px; }
+  .spread-input .magnitude { flex: 1 1 100%; min-height: 46px; }
+}
+
+/* ------------------------------------------------------------ dialogs */
+
+dialog {
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 12px; padding: 20px 22px; min-width: min(420px, 92vw);
+}
+dialog::backdrop { background: rgba(0, 0, 0, .58); }
+dialog h3 { margin: 0 0 8px; }
+.dialog-detail { color: var(--ink-dim); margin: 0 0 14px; }
+dialog label { display: grid; gap: 5px; margin-bottom: 13px; font-size: 13.5px;
+  color: var(--ink-dim); }
+dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 0; margin: 18px 0 0; }
+dialog menu .danger { margin-right: auto; }
+
+@media (max-width: 700px) {
+  .game { grid-template-columns: 1fr; }
+  .order-strip { flex-wrap: wrap; }
+  /* Side-by-side, a long team name and its reason collide with the number. */
+  .side .why { display: block; margin-top: 2px; }
+  .side .num { white-space: nowrap; }
+}
