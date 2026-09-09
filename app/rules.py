@@ -9,6 +9,12 @@ TOTAL_WEEKS = 18
 # A pick must be made within this long of the line being pulled from the book.
 LINE_MAX_AGE = timedelta(hours=1)
 
+# Hour (UTC) on the anchor weekday that one week rolls over to the next.
+# Monday Night Football kicks at 8:15pm ET, which is already Tuesday in UTC and
+# runs past 04:00 UTC, so a midnight boundary would file it under the next week.
+# Noon UTC sits clear of both that and Thursday's opener.
+WEEK_ROLLOVER_HOUR = 12
+
 
 def draft_order(week: int) -> list[str]:
     """Snake order for a week.
@@ -49,10 +55,13 @@ def line_is_fresh(fetched_at: str, now: datetime | None = None) -> bool:
 def week_for_kickoff(commence_time: str, anchor: str) -> int:
     """Bucket a kickoff into an NFL week as a 7-day block from the week-1 anchor.
 
-    `anchor` is the Tuesday that opens week 1, which keeps a Thursday-to-Monday
-    slate inside one bucket.
+    `anchor` is the Tuesday that opens week 1. A bare date rolls over at
+    WEEK_ROLLOVER_HOUR so a Monday night game -- already Tuesday in UTC -- stays
+    with the week it belongs to; pass an explicit time to override that.
     """
-    start = parse_iso(anchor if "T" in anchor else anchor + "T00:00:00+00:00")
+    if "T" not in anchor:
+        anchor = f"{anchor}T{WEEK_ROLLOVER_HOUR:02d}:00:00+00:00"
+    start = parse_iso(anchor)
     delta = parse_iso(commence_time) - start
     return max(1, min(TOTAL_WEEKS, delta.days // 7 + 1))
 

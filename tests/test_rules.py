@@ -153,9 +153,27 @@ def test_line_freshness_window_is_one_hour():
 def test_kickoffs_bucket_into_weeks_from_the_anchor():
     anchor = "2026-09-08"
     assert rules.week_for_kickoff("2026-09-10T00:20:00Z", anchor) == 1   # Thursday opener
-    assert rules.week_for_kickoff("2026-09-14T23:15:00Z", anchor) == 1   # Monday night
-    assert rules.week_for_kickoff("2026-09-15T00:00:00Z", anchor) == 2   # Tuesday rolls over
-    assert rules.week_for_kickoff("2027-01-03T18:00:00Z", anchor) == 17
+    assert rules.week_for_kickoff("2026-09-13T17:00:00Z", anchor) == 1   # Sunday early
+    assert rules.week_for_kickoff("2026-09-14T00:20:00Z", anchor) == 1   # Sunday night
+    assert rules.week_for_kickoff("2026-09-17T00:15:00Z", anchor) == 2   # next Thursday
+
+
+def test_monday_night_stays_with_its_own_week():
+    """MNF kicks at 8:15pm ET, which is already Tuesday in UTC.
+
+    A midnight rollover would file every Monday nighter under the next week.
+    """
+    anchor = "2026-09-08"
+    assert rules.week_for_kickoff("2026-09-15T00:15:00Z", anchor) == 1   # kickoff
+    assert rules.week_for_kickoff("2026-09-15T04:00:00Z", anchor) == 1   # still playing
+    # A real week 17 Monday nighter that used to land in week 18.
+    assert rules.week_for_kickoff("2027-01-05T01:15:00Z", anchor) == 17
+    assert rules.week_for_kickoff("2027-01-10T18:00:00Z", anchor) == 18
+
+
+def test_an_explicit_anchor_time_overrides_the_default_rollover():
+    assert rules.week_for_kickoff("2026-09-15T00:15:00Z", "2026-09-08T00:00:00Z") == 2
+    assert rules.week_for_kickoff("2026-09-15T00:15:00Z", "2026-09-08") == 1
 
 
 def test_spreads_render_the_way_a_board_shows_them():

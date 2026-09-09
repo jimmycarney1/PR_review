@@ -76,8 +76,14 @@ gets flagged as an override.
 
 `SEASON_WEEK1_ANCHOR` is the Tuesday that opens week 1 — games are bucketed into
 weeks in 7-day blocks from it, so a Thursday-through-Monday slate lands in one
-week. **Check this before week 1**: the default (`2026-09-08`) is a guess at the
-2026 opener. If your slate shows up under the wrong week, move the anchor.
+week. A bare date rolls over at noon UTC rather than midnight, because Monday
+Night Football kicks at 8:15pm ET and runs past 04:00 UTC Tuesday; a midnight
+boundary files it under the following week. Pass an explicit time
+(`2026-09-08T00:00:00Z`) to override that.
+
+The default `2026-09-08` is confirmed correct for the 2026 season — it buckets
+the real slate into 15/16/15 games for weeks 1/2/3. Change it only for a
+different season.
 
 ## Deploying to Railway
 
