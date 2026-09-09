@@ -368,3 +368,61 @@ def test_ui_is_served(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "Pigskin" in r.text
+
+
+def test_a_game_can_be_taken_back_off_the_board(client, stub_odds):
+    """A hand-added game entered by mistake shouldn't be stuck there all season."""
+    gid = client.post(
+        "/api/games/manual",
+        json={"week": 1, "home_team": "Denver Broncos", "away_team": "Las Vegas Raiders"},
+    ).json()["game_id"]
+    assert any(g["id"] == gid for g in
+               client.get("/api/board", params={"week": 1}).json()["games"])
+
+    assert client.request("DELETE", f"/api/games/{gid}").status_code == 200
+    assert not any(g["id"] == gid for g in
+                   client.get("/api/board", params={"week": 1}).json()["games"])
+
+
+def test_a_game_with_a_pick_in_it_cannot_be_removed(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    gb_chi = ids[("Chicago Bears", "Green Bay Packers")]
+    pick(client, "Jimmy", "Chicago Bears", gb_chi)
+
+    r = client.request("DELETE", f"/api/games/{gb_chi}")
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "GAME_HAS_PICKS"
+    assert "Jimmy has Chicago Bears" in r.json()["detail"]["message"]
+    # The game and the pick both survive the refusal.
+    assert len(client.get("/api/board", params={"week": 1}).json()["picks"]) == 1
+
+
+def test_removing_a_game_takes_its_lines_with_it(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    kc_buf = ids[("Buffalo Bills", "Kansas City Chiefs")]
+    assert client.request("DELETE", f"/api/games/{kc_buf}").status_code == 200
+
+    conn = db_module.connect()
+    orphans = conn.execute(
+        "SELECT COUNT(*) c FROM lines WHERE game_id = ?", (kc_buf,)
+    ).fetchone()["c"]
+    conn.close()
+    assert orphans == 0
+
+
+def test_board_marks_which_games_can_be_removed(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    gb_chi = ids[("Chicago Bears", "Green Bay Packers")]
+    pick(client, "Jimmy", "Chicago Bears", gb_chi)
+
+    games = {g["id"]: g["removable"] for g in
+             client.get("/api/board", params={"week": 1}).json()["games"]}
+    assert games[gb_chi] is False
+    assert games[ids[("Buffalo Bills", "Kansas City Chiefs")]] is True
+
+
+def test_removing_a_missing_game_is_a_404(client):
+    assert client.request("DELETE", "/api/games/999").status_code == 404

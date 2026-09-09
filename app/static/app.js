@@ -197,6 +197,23 @@ function gameRow(game, board) {
   }
   row.append(when);
 
+  // A hand-added game with nothing riding on it can be taken back off.
+  if (game.removable && !game.event_id) {
+    const remove = el("button", "remove-game", "×");
+    remove.title = "Remove this game from the board";
+    remove.setAttribute("aria-label", `Remove ${game.away_team} at ${game.home_team}`);
+    remove.addEventListener("click", async () => {
+      try {
+        await api(`/api/games/${game.id}`, { method: "DELETE" });
+        await render();
+        say(`Removed ${game.away_team} @ ${game.home_team} from the board.`, "ok");
+      } catch (err) {
+        say(err.message, "error", true);
+      }
+    });
+    when.append(remove);
+  }
+
   game.sides.forEach((side) => {
     const noLine = side.spread === null;
     const button = el("button", "side");

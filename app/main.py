@@ -187,6 +187,7 @@ def board(week: int = 1, conn=Depends(db)):
             )
         game["sides"] = sides
         game["result_known"] = bool(game["completed"])
+        game["removable"] = not any(p["game_id"] == game["id"] for p in picks)
 
     return {
         "week": week,
@@ -273,6 +274,34 @@ def add_manual_game(payload: ManualGame, conn=Depends(db)):
     )
     conn.commit()
     return {"game_id": cur.lastrowid}
+
+
+@app.delete("/api/games/{game_id}")
+def remove_game(game_id: int, conn=Depends(db)):
+    """Take a game off the board -- for a hand-added one entered by mistake.
+
+    Refused once anyone has picked in it: a pick's game is part of the record,
+    and the ledger would be left pointing at a game that no longer exists.
+    Remove the pick first if that's really the intent.
+    """
+    _game_row(conn, game_id)
+    picks = conn.execute(
+        "SELECT player, team FROM picks WHERE game_id = ? ORDER BY slot", (game_id,)
+    ).fetchall()
+    if picks:
+        held = ", ".join(f"{p['player']} has {p['team']}" for p in picks)
+        raise HTTPException(
+            409,
+            {
+                "code": "GAME_HAS_PICKS",
+                "message": f"Can't remove this game -- {held}. Remove the pick first.",
+            },
+        )
+    # Lines are snapshot data for this game and go with it.
+    conn.execute("DELETE FROM lines WHERE game_id = ?", (game_id,))
+    conn.execute("DELETE FROM games WHERE id = ?", (game_id,))
+    conn.commit()
+    return {"deleted": game_id}
 
 
 # ---------------------------------------------------------------- picks
