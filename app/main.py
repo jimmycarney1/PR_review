@@ -581,9 +581,26 @@ def ledger(week: int | None = None, limit: int = 200, conn=Depends(db)):
 
 # ---------------------------------------------------------------- static UI
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+class RevalidatingStatic(StaticFiles):
+    """Serve static files with `no-cache`.
+
+    Without an explicit Cache-Control a browser is free to reuse a cached copy
+    without asking, which left phones running the previous deploy's JavaScript.
+    `no-cache` means revalidate, not "don't cache" -- the ETag still turns an
+    unchanged file into a 304, so this costs a round trip, not a download.
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/static", RevalidatingStatic(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(
+        STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"}
+    )

@@ -453,3 +453,27 @@ def test_every_week_reports_the_same_live_week(client, stub_odds):
     weeks = {client.get("/api/board", params={"week": w}).json()["current_week"]
              for w in (1, 5, 12, 18)}
     assert len(weeks) == 1
+
+
+def test_static_assets_must_be_revalidated(client):
+    """Without this a phone keeps running the previous deploy's JavaScript."""
+    for path in ("/", "/static/app.js", "/static/styles.css", "/static/index.html"):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        assert r.headers.get("cache-control") == "no-cache", path
+
+
+def test_unchanged_assets_still_answer_304(client):
+    """no-cache costs a round trip, not a re-download."""
+    first = client.get("/static/app.js")
+    again = client.get("/static/app.js", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304
+
+
+def test_cancel_buttons_skip_form_validation(client):
+    """A dialog's Cancel shares a form with required fields; without
+    formnovalidate the browser blocks it and the dialog will not close."""
+    html = client.get("/").text
+    cancels = [line for line in html.splitlines() if 'value="cancel"' in line]
+    assert len(cancels) == 2
+    assert all("formnovalidate" in line for line in cancels), cancels
