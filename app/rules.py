@@ -66,6 +66,17 @@ def week_for_kickoff(commence_time: str, anchor: str) -> int:
     return max(1, min(TOTAL_WEEKS, delta.days // 7 + 1))
 
 
+def current_week(anchor: str, now: datetime | None = None) -> int:
+    """The week the season is in right now.
+
+    Shares a boundary with week_for_kickoff, so the week the site opens on is
+    always the week whose games are on the board. Clamped to the season, so
+    before kickoff it reads week 1 and after the finale it stays on week 18.
+    """
+    moment = now or datetime.now(timezone.utc)
+    return week_for_kickoff(moment.isoformat(), anchor)
+
+
 class PickError(Exception):
     """A rejected pick. `code` lets the UI react (e.g. force a line refresh)."""
 

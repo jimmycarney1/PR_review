@@ -1,6 +1,6 @@
 "use strict";
 
-const state = { week: 1, view: "draft", board: null };
+const state = { week: null, view: "draft", board: null };
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -65,7 +65,6 @@ const stamp = (iso) =>
 function buildWeekPicker() {
   const select = $("#week");
   for (let w = 1; w <= 18; w++) select.append(new Option(`Week ${w}`, w));
-  select.value = state.week;
   select.addEventListener("change", () => {
     state.week = Number(select.value);
     render();
@@ -97,12 +96,31 @@ function buildTabs() {
 
 async function render() {
   clearAlert();
-  state.board = await api(`/api/board?week=${state.week}`);
+  // No week on the first load: the server answers with the live one.
+  state.board = await api(
+    state.week === null ? "/api/board" : `/api/board?week=${state.week}`
+  );
+  state.week = state.board.week;
+  $("#week").value = state.week;
+  markLiveWeek(state.board.current_week);
   renderCredits(state.board.credits);
   if (state.view === "draft") renderDraft();
   if (state.view === "results") renderResults();
   if (state.view === "standings") await renderStandings();
   if (state.view === "ledger") await renderLedger();
+}
+
+// Label the live week in the picker, so a week you navigated to is never
+// mistaken for the one the season is actually in.
+function markLiveWeek(live) {
+  [...$("#week").options].forEach((option) => {
+    const week = Number(option.value);
+    option.textContent = week === live ? `Week ${week} · now` : `Week ${week}`;
+  });
+  const away = $("#back-to-live");
+  away.hidden = state.week === live;
+  away.textContent = `Back to week ${live}`;
+  away.dataset.week = live;
 }
 
 function renderCredits(credits) {
@@ -680,6 +698,11 @@ async function renderLedger() {
 }
 
 /* --------------------------------------------------------------- boot */
+
+$("#back-to-live").addEventListener("click", (event) => {
+  state.week = Number(event.target.dataset.week);
+  render().catch((err) => say(err.message, "error", true));
+});
 
 buildWeekPicker();
 buildTabs();

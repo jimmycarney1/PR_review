@@ -181,3 +181,37 @@ def test_spreads_render_the_way_a_board_shows_them():
     assert rules.format_spread(-3.5) == "-3.5"
     assert rules.format_spread(0) == "PK"
     assert rules.format_spread(-10) == "-10"
+
+
+def test_current_week_tracks_the_calendar():
+    anchor = "2026-09-08"
+    def at(ts):
+        return rules.current_week(anchor, datetime.fromisoformat(ts.replace("Z", "+00:00")))
+
+    assert at("2026-09-10T18:00:00Z") == 1    # Thursday opener
+    assert at("2026-09-14T23:00:00Z") == 1    # Monday, week 1 still running
+    assert at("2026-09-15T13:00:00Z") == 2    # Tuesday, week 2 is up
+    assert at("2026-09-22T16:00:00Z") == 3
+
+
+def test_current_week_is_clamped_to_the_season():
+    anchor = "2026-09-08"
+    def at(ts):
+        return rules.current_week(anchor, datetime.fromisoformat(ts.replace("Z", "+00:00")))
+
+    assert at("2026-07-04T12:00:00Z") == 1    # long before kickoff
+    assert at("2027-02-15T12:00:00Z") == 18   # after the finale
+    assert at("2030-01-01T12:00:00Z") == 18
+
+
+def test_current_week_shares_its_boundary_with_game_bucketing():
+    """The week the site opens on must be the week those games are filed under."""
+    anchor = "2026-09-08"
+    kickoff = "2026-09-15T00:15:00Z"          # week 1's Monday nighter
+    moment = rules.parse_iso(kickoff)
+    assert rules.current_week(anchor, moment) == rules.week_for_kickoff(kickoff, anchor)
+
+
+def test_current_week_defaults_to_the_real_clock():
+    week = rules.current_week("2026-09-08")
+    assert 1 <= week <= rules.TOTAL_WEEKS

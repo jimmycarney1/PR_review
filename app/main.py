@@ -139,8 +139,15 @@ def health(conn=Depends(db)):
 
 
 @app.get("/api/board")
-def board(week: int = 1, conn=Depends(db)):
-    """Everything the draft screen renders: order, picks, open board, freshness."""
+def board(week: int | None = None, conn=Depends(db)):
+    """Everything the draft screen renders: order, picks, open board, freshness.
+
+    Omit `week` to get whichever week the season is actually in, so opening the
+    site lands on the live week instead of week 1 every time.
+    """
+    live = rules.current_week(SEASON_ANCHOR)
+    if week is None:
+        week = live
     if not 1 <= week <= rules.TOTAL_WEEKS:
         raise HTTPException(400, f"Week must be 1..{rules.TOTAL_WEEKS}.")
 
@@ -191,6 +198,7 @@ def board(week: int = 1, conn=Depends(db)):
 
     return {
         "week": week,
+        "current_week": live,
         "total_weeks": rules.TOTAL_WEEKS,
         "players": rules.PLAYERS,
         "draft_order": rules.draft_order(week),

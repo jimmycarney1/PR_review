@@ -426,3 +426,30 @@ def test_board_marks_which_games_can_be_removed(client, stub_odds):
 
 def test_removing_a_missing_game_is_a_404(client):
     assert client.request("DELETE", "/api/games/999").status_code == 404
+
+
+def test_board_without_a_week_serves_the_live_one(client, stub_odds):
+    """Opening the site lands on the week the season is in, not week 1."""
+    from app import main, rules
+
+    live = rules.current_week(main.SEASON_ANCHOR)
+    body = client.get("/api/board").json()
+    assert body["week"] == live
+    assert body["current_week"] == live
+
+
+def test_an_explicit_week_still_wins(client, stub_odds):
+    from app import main, rules
+
+    live = rules.current_week(main.SEASON_ANCHOR)
+    other = 1 if live != 1 else 18
+    body = client.get("/api/board", params={"week": other}).json()
+    assert body["week"] == other
+    # The live week is still reported, so the UI can offer a way back to it.
+    assert body["current_week"] == live
+
+
+def test_every_week_reports_the_same_live_week(client, stub_odds):
+    weeks = {client.get("/api/board", params={"week": w}).json()["current_week"]
+             for w in (1, 5, 12, 18)}
+    assert len(weeks) == 1
