@@ -1,0 +1,20 @@
+# Railway build and deploy config.
+#
+# Before the first deploy, in the Railway dashboard:
+#   1. Add a Volume to the service, mounted at /data.
+#   2. Set PIGSKIN_DB=/data/pigskin.db so SQLite lives on that volume.
+#      Without it the database sits on the container's ephemeral disk and
+#      every redeploy wipes the season.
+#   3. Set ODDS_API_KEY and SEASON_WEEK1_ANCHOR.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+# One process: SQLite takes a single writer, and three players don't need more.
+numReplicas = 1
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
