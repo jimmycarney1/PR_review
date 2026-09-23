@@ -477,3 +477,98 @@ def test_cancel_buttons_skip_form_validation(client):
     cancels = [line for line in html.splitlines() if 'value="cancel"' in line]
     assert len(cancels) == 2
     assert all("formnovalidate" in line for line in cancels), cancels
+
+
+@pytest.fixture
+def texting(monkeypatch):
+    """Twilio configured, with every send captured instead of sent."""
+    from app import notify
+
+    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC_test")
+    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "token_test")
+    monkeypatch.setenv("TWILIO_FROM_NUMBER", "+15550000000")
+    monkeypatch.setenv("PHONE_JIMMY", "+15550000001")
+    monkeypatch.setenv("PHONE_MACK", "+15550000002")
+    monkeypatch.setenv("PHONE_ANTHONY", "+15550000003")
+    monkeypatch.setenv("APP_URL", "https://example.test")
+
+    outbox = []
+    monkeypatch.setattr(
+        notify, "_post",
+        lambda sid, token, sender, to, body: outbox.append((to, body)) or "SM_fake",
+    )
+    return outbox
+
+
+def test_a_pick_texts_whoever_is_now_on_the_clock(client, stub_odds, texting):
+    refresh(client)
+    ids = game_ids(client)
+    r = pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    assert r.status_code == 200
+    assert r.json()["notified"] == {"player": "Mack", "status": "sent"}
+
+    to, body = texting[0]
+    assert to == "+15550000002"                    # Mack is next in week 1
+    assert "week 1, pick 2 of 6" in body
+    assert "Jimmy took Chicago Bears +3" in body
+
+
+def test_the_last_pick_of_a_week_texts_nobody(client, stub_odds, texting):
+    refresh(client)
+    ids = game_ids(client)
+    gb_chi = ids[("Chicago Bears", "Green Bay Packers")]
+    kc_buf = ids[("Buffalo Bills", "Kansas City Chiefs")]
+    extra = [
+        client.post("/api/games/manual",
+                    json={"week": 1, "home_team": h, "away_team": a}).json()["game_id"]
+        for h, a in [("Dallas Cowboys", "Philadelphia Eagles"),
+                     ("Denver Broncos", "Las Vegas Raiders")]
+    ]
+    pick(client, "Jimmy", "Chicago Bears", gb_chi)
+    pick(client, "Mack", "Kansas City Chiefs", kc_buf)
+    pick(client, "Anthony", "Buffalo Bills", kc_buf)
+    pick(client, "Anthony", "Philadelphia Eagles", extra[0],
+         override_spread=2.5, override_reason="hand-entered")
+    pick(client, "Mack", "Dallas Cowboys", extra[0],
+         override_spread=-2.5, override_reason="hand-entered")
+    last = pick(client, "Jimmy", "Denver Broncos", extra[1],
+                override_spread=-1, override_reason="hand-entered")
+
+    assert last.json()["notified"] is None
+    assert len(texting) == 5                        # picks 1-5 each woke someone
+
+
+def test_a_texting_outage_never_costs_a_pick(client, stub_odds, texting, monkeypatch):
+    from app import notify
+
+    def boom(*args):
+        raise RuntimeError("twilio is down")
+
+    monkeypatch.setattr(notify, "_post", boom)
+    refresh(client)
+    ids = game_ids(client)
+    r = pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+
+    assert r.status_code == 200
+    assert r.json()["notified"] == {"player": "Mack", "status": "failed"}
+    board = client.get("/api/board", params={"week": 1}).json()
+    assert [p["label"] for p in board["picks"]] == ["Chicago Bears +3"]
+    assert board["on_clock"] == {"slot": 2, "player": "Mack"}
+
+
+def test_picks_still_work_with_no_twilio_at_all(client, stub_odds, monkeypatch):
+    for key in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER",
+                "PHONE_JIMMY", "PHONE_MACK", "PHONE_ANTHONY"):
+        monkeypatch.delenv(key, raising=False)
+    refresh(client)
+    ids = game_ids(client)
+    r = pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    assert r.status_code == 200
+    assert r.json()["notified"] == {"player": "Mack", "status": "skipped"}
+
+
+def test_the_board_reports_whether_texting_is_on(client, stub_odds, texting):
+    state = client.get("/api/board", params={"week": 1}).json()["texting"]
+    assert state["configured"] is True
+    assert state["players_with_numbers"] == ["Anthony", "Jimmy", "Mack"]
+    assert "5550000001" not in str(state)

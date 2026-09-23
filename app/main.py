@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import odds, rules
+from . import notify, odds, rules
 from .db import DB_PATH, connect, init_db, now_iso
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -209,6 +209,7 @@ def board(week: int | None = None, conn=Depends(db)):
         "snapshot": snapshot,
         "line_max_age_minutes": int(rules.LINE_MAX_AGE.total_seconds() // 60),
         "credits": odds.credit_status(conn),
+        "texting": notify.status(conn),
     }
 
 
@@ -381,20 +382,47 @@ def make_pick(payload: PickIn, conn=Depends(db)):
          snapshot_id, line_fetched_at, payload.override_reason, ts, ts),
     )
     pick_id = cur.lastrowid
+    label = f"{payload.team} {rules.format_spread(spread)}"
     _log(
         conn, pick_id, payload.week, payload.player, "create", payload.player,
-        new=f"{payload.team} {rules.format_spread(spread)}",
+        new=label,
         reason=payload.override_reason if source == "override" else None,
     )
     conn.commit()
+
+    # The pick is committed before anyone is texted, and texting is best
+    # effort -- a Twilio outage must never cost someone their pick.
+    texted = _tell_next_player(
+        conn, week=payload.week, previous={"player": payload.player, "label": label}
+    )
+
     return {
         "pick_id": pick_id,
         "slot": slot,
         "team": payload.team,
         "spread": spread,
-        "display": f"{payload.team} {rules.format_spread(spread)}",
+        "display": label,
         "line_source": source,
+        "notified": texted,
     }
+
+
+def _tell_next_player(conn, *, week: int, previous: dict | None) -> dict | None:
+    """Text whoever the pick just put on the clock. Swallows every failure."""
+    try:
+        on_clock = rules.player_on_clock(
+            week, {p["slot"] for p in _picks_for_week(conn, week)}
+        )
+        if on_clock is None:
+            return None                      # week is full; nobody is up
+        slot, player = on_clock
+        outcome = notify.notify_on_clock(
+            conn, week=week, slot=slot, slots=rules.SLOTS_PER_WEEK,
+            player=player, previous=previous,
+        )
+        return {"player": player, "status": outcome}
+    except Exception:
+        return {"status": "failed"}
 
 
 @app.patch("/api/picks/{pick_id}")

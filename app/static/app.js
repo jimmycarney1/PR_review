@@ -104,6 +104,7 @@ async function render() {
   $("#week").value = state.week;
   markLiveWeek(state.board.current_week);
   renderCredits(state.board.credits);
+  renderTexting(state.board.texting);
   if (state.view === "draft") renderDraft();
   if (state.view === "results") renderResults();
   if (state.view === "standings") await renderStandings();
@@ -137,6 +138,19 @@ function renderCredits(credits) {
   }
   box.className = `credits${credits.remaining < 50 ? " low" : ""}`;
   box.innerHTML = `<strong>${credits.remaining}</strong> API credits left<br>as of ${stamp(credits.as_of)}`;
+}
+
+// Whether the person on the clock actually gets a text, without naming numbers.
+function renderTexting(texting) {
+  const box = $("#texting");
+  if (!texting) return;
+  const ready = texting.configured && texting.players_with_numbers.length === 3;
+  box.className = `texting${ready ? " on" : ""}`;
+  box.textContent = ready
+    ? "texts on"
+    : texting.configured
+      ? `texts: ${texting.players_with_numbers.length}/3 numbers set`
+      : "texts off";
 }
 
 /* ---------------------------------------------------------------- draft */

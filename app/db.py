@@ -77,6 +77,22 @@ CREATE TABLE IF NOT EXISTS picks (
 );
 CREATE INDEX IF NOT EXISTS idx_picks_week ON picks(week);
 
+-- Every text the app tried to send, so a missed nudge can be explained
+-- without digging through logs. Numbers are stored masked -- the full number
+-- lives only in the environment.
+CREATE TABLE IF NOT EXISTS notifications (
+    id         INTEGER PRIMARY KEY,
+    week       INTEGER,
+    player     TEXT NOT NULL,
+    to_masked  TEXT,
+    kind       TEXT NOT NULL,          -- 'on_clock'
+    body       TEXT NOT NULL,
+    status     TEXT NOT NULL,          -- 'sent' | 'skipped' | 'failed'
+    detail     TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_week ON notifications(week);
+
 -- Append-only audit trail. Every create, field edit and delete lands here.
 CREATE TABLE IF NOT EXISTS pick_ledger (
     id         INTEGER PRIMARY KEY,

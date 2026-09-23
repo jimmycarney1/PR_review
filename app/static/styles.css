@@ -53,6 +53,10 @@ body {
 .live-jump { border-color: var(--turf-dim); color: var(--turf); font-size: 12.5px; }
 .live-jump:hover { color: var(--ink); border-color: var(--turf); }
 
+.texting { font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--push); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+.texting.on { color: var(--turf); border-color: var(--turf-dim); }
+
 .credits { font-size: 12.5px; color: var(--ink-dim); text-align: right; }
 .credits strong { color: var(--ink); }
 .credits.low strong { color: var(--gold); }

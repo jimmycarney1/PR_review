@@ -116,12 +116,44 @@ means anyone with the link can make and edit picks — every change is attribute
 and ledgered, but nothing stops it. Fine if you keep the URL between the three of
 you; if you'd rather not rely on that, a shared passcode is a small addition.
 
+## Texting the player on the clock
+
+When a pick is locked in, the app works out who that put on the clock and
+texts them: *"Pigskin: you're up — week 3, pick 2 of 6. Anthony took Minnesota
+Vikings -2.5."* plus a link to the board. Nobody is texted for the sixth pick
+of a week, since it puts no one on the clock.
+
+It stays dormant until the environment carries Twilio credentials and phone
+numbers. With nothing set, every send is recorded as `skipped` and drafting is
+untouched — the header reads "texts off" rather than failing.
+
+| Variable | |
+| -------- | - |
+| `TWILIO_ACCOUNT_SID` | from the Twilio console |
+| `TWILIO_AUTH_TOKEN` | from the Twilio console |
+| `TWILIO_FROM_NUMBER` | the Twilio number, `+1...` |
+| `PHONE_JIMMY` / `PHONE_MACK` / `PHONE_ANTHONY` | `+1...` |
+| `APP_URL` | optional; Railway sets `RAILWAY_PUBLIC_DOMAIN` itself |
+
+Phone numbers live in the environment, never in the repo or the database. The
+`notifications` table records every attempt — sent, skipped or failed — but
+stores only the last four digits, enough to tell two numbers apart.
+
+**Texting never costs anyone a pick.** The pick is committed before any text is
+attempted, and every failure below it — bad credentials, a Twilio outage, a
+timeout — is swallowed into that table. A player missing a number is skipped
+individually, so the other two still get theirs.
+
+Cost is Twilio's: roughly $1.15/month for the number and ~$0.008 per message.
+At five texts a week that is a couple of dollars for the season.
+
 ## Layout
 
 ```
 app/rules.py    league rules as pure functions -- draft order, legality, grading
 app/db.py       SQLite schema
 app/odds.py     The Odds API client and credit tracking
+app/notify.py   Twilio texts for the player on the clock
 app/main.py     JSON API
 app/static/     the UI (plain HTML/CSS/JS, no build)
 tests/          57 tests
