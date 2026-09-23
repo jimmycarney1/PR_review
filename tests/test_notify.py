@@ -111,3 +111,18 @@ def test_status_reports_readiness_without_leaking_numbers(conn, configured):
     assert state["configured"] is True
     assert state["players_with_numbers"] == ["Mack"]
     assert "5551234567" not in str(state)
+
+
+def test_status_surfaces_the_last_failure(conn, configured, monkeypatch):
+    """Configured is not the same as working -- the UI needs to tell them apart."""
+    monkeypatch.setattr(notify, "_post", lambda *a: (_ for _ in ()).throw(RuntimeError("572006")))
+    notify.send(conn, player="Mack", body="hi", week=3)
+    state = notify.status(conn)
+    assert state["configured"] is True
+    assert state["last"]["status"] == "failed"
+
+
+def test_status_reports_a_clean_send(conn, configured, monkeypatch):
+    monkeypatch.setattr(notify, "_post", lambda *a: "SM_ok")
+    notify.send(conn, player="Mack", body="hi", week=3)
+    assert notify.status(conn)["last"]["status"] == "sent"

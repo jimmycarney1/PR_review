@@ -145,12 +145,20 @@ function renderTexting(texting) {
   const box = $("#texting");
   if (!texting) return;
   const ready = texting.configured && texting.players_with_numbers.length === 3;
-  box.className = `texting${ready ? " on" : ""}`;
-  box.textContent = ready
-    ? "texts on"
-    : texting.configured
-      ? `texts: ${texting.players_with_numbers.length}/3 numbers set`
-      : "texts off";
+  // Configured is not the same as working -- say so when the last one bounced,
+  // rather than showing "on" while nothing is arriving.
+  const failing = texting.last?.status === "failed";
+  box.className = `texting${failing ? " bad" : ready ? " on" : ""}`;
+  box.title = failing
+    ? "The last text failed. Check the notifications table for the reason."
+    : "Whether the player on the clock gets a text";
+  box.textContent = failing
+    ? "texts failing"
+    : ready
+      ? "texts on"
+      : texting.configured
+        ? `texts: ${texting.players_with_numbers.length}/3 numbers set`
+        : "texts off";
 }
 
 /* ---------------------------------------------------------------- draft */

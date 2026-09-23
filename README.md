@@ -147,6 +147,16 @@ individually, so the other two still get theirs.
 Cost is Twilio's: roughly $1.15/month for the number and ~$0.008 per message.
 At five texts a week that is a couple of dollars for the season.
 
+**A Twilio trial account cannot send these texts.** Trials are limited to
+predefined templates and reject a custom body with error 572006, and they can
+only reach numbers verified in the console. The account also has to own the
+number in `TWILIO_FROM_NUMBER`. Upgrading the account (adding a balance) lifts
+both restrictions; no code changes are needed once it is upgraded.
+
+The header pill reads "texts off" when nothing is configured, "texts failing"
+when the last attempt bounced, and "texts on" only when the last one landed --
+so a misconfiguration shows up on the page rather than as missing texts.
+
 ## Layout
 
 ```
