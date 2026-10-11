@@ -215,3 +215,61 @@ def test_current_week_shares_its_boundary_with_game_bucketing():
 def test_current_week_defaults_to_the_real_clock():
     week = rules.current_week("2026-09-08")
     assert 1 <= week <= rules.TOTAL_WEEKS
+
+
+FAV_WON_BY_6 = {"home_team": "A", "away_team": "B",
+                "home_score": 26, "away_score": 20, "completed": 1}
+FAV_LOST_BY_3 = {"home_team": "A", "away_team": "B",
+                 "home_score": 17, "away_score": 20, "completed": 1}
+
+
+def test_cover_margin_matches_the_league_definition():
+    """A -3 favorite winning by 6 is +3; losing by 3 off that same -3 is -6."""
+    assert rules.cover_margin("A", -3, FAV_WON_BY_6) == 3
+    assert rules.cover_margin("A", -3, FAV_LOST_BY_3) == -6
+
+
+def test_the_two_sides_of_a_game_are_mirror_images():
+    for spread in (-3, -7.5, 0):
+        ours = rules.cover_margin("A", spread, FAV_WON_BY_6)
+        theirs = rules.cover_margin("B", -spread, FAV_WON_BY_6)
+        assert ours == -theirs
+
+
+def test_a_push_is_exactly_zero():
+    game = {**FAV_WON_BY_6, "home_score": 24, "away_score": 21}
+    assert rules.cover_margin("A", -3, game) == 0
+    assert rules.grade_pick("A", -3, game) == "PUSH"
+
+
+def test_margin_and_result_can_never_disagree():
+    game = {**FAV_WON_BY_6}
+    for spread in (-10, -6.5, -6, -5.5, 0, 3, 7.5):
+        margin = rules.cover_margin("A", spread, game)
+        result = rules.grade_pick("A", spread, game)
+        assert result == ("WIN" if margin > 0 else "LOSS" if margin < 0 else "PUSH")
+
+
+def test_an_ungraded_game_has_no_margin():
+    assert rules.cover_margin("A", -3, {**FAV_WON_BY_6, "completed": 0}) is None
+    assert rules.cover_margin(
+        "A", -3, {**FAV_WON_BY_6, "home_score": None, "away_score": None, "completed": 0}
+    ) is None
+
+
+def test_a_margin_always_shows_its_sign():
+    assert rules.format_margin(3) == "+3"
+    assert rules.format_margin(-6) == "-6"
+    assert rules.format_margin(0) == "0"
+    assert rules.format_margin(2.5) == "+2.5"
+    assert rules.format_margin(None) == "—"
+
+
+def test_a_big_loss_hurts_more_than_a_narrow_one():
+    """The point of tracking it: two 0-1 weeks are not the same week."""
+    blowout = {"home_team": "A", "away_team": "B",
+               "home_score": 3, "away_score": 38, "completed": 1}
+    narrow = {"home_team": "A", "away_team": "B",
+              "home_score": 20, "away_score": 24, "completed": 1}
+    assert rules.grade_pick("A", -3, blowout) == rules.grade_pick("A", -3, narrow) == "LOSS"
+    assert rules.cover_margin("A", -3, blowout) < rules.cover_margin("A", -3, narrow)

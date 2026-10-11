@@ -572,3 +572,109 @@ def test_the_board_reports_whether_texting_is_on(client, stub_odds, texting):
     assert state["configured"] is True
     assert state["players_with_numbers"] == ["Anthony", "Jimmy", "Mack"]
     assert "5550000001" not in str(state)
+
+
+def _graded_week(client):
+    """Week 1 with three graded picks, spanning a cover, a miss and a push."""
+    refresh(client)
+    ids = game_ids(client)
+    gb_chi = ids[("Chicago Bears", "Green Bay Packers")]
+    kc_buf = ids[("Buffalo Bills", "Kansas City Chiefs")]
+    pick(client, "Jimmy", "Chicago Bears", gb_chi)         # +3
+    pick(client, "Mack", "Green Bay Packers", gb_chi)      # -3
+    pick(client, "Anthony", "Buffalo Bills", kc_buf)       # +1.5
+    # Packers win by 3 off -3: a push both ways. Bills win by 7 off +1.5: +8.5.
+    client.post("/api/scores/manual",
+                json={"game_id": gb_chi, "home_score": 24, "away_score": 21})
+    client.post("/api/scores/manual",
+                json={"game_id": kc_buf, "home_score": 17, "away_score": 24})
+    return gb_chi, kc_buf
+
+
+def test_each_pick_reports_what_it_beat_the_spread_by(client, stub_odds):
+    _graded_week(client)
+    by_team = {p["team"]: p for p in
+               client.get("/api/board", params={"week": 1}).json()["picks"]}
+    assert by_team["Chicago Bears"]["margin"] == 0           # push
+    assert by_team["Chicago Bears"]["margin_display"] == "0"
+    assert by_team["Green Bay Packers"]["margin"] == 0
+    assert by_team["Buffalo Bills"]["margin"] == 8.5
+    assert by_team["Buffalo Bills"]["margin_display"] == "+8.5"
+
+
+def test_an_ungraded_pick_has_no_margin(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    saved = client.get("/api/board", params={"week": 1}).json()["picks"][0]
+    assert saved["margin"] is None
+    assert saved["margin_display"] == "—"
+
+
+def test_standings_carry_a_season_differential(client, stub_odds):
+    _graded_week(client)
+    table = {s["player"]: s for s in client.get("/api/standings").json()["standings"]}
+    assert table["Anthony"]["margin"] == 8.5
+    assert table["Anthony"]["margin_display"] == "+8.5"
+    assert table["Jimmy"]["margin"] == 0
+    assert table["Mack"]["margin"] == 0
+
+
+def test_differential_breaks_a_tie_in_the_standings(client, stub_odds):
+    """Two players on the same record should not be ordered arbitrarily."""
+    refresh(client)
+    ids = game_ids(client)
+    gb_chi = ids[("Chicago Bears", "Green Bay Packers")]
+    kc_buf = ids[("Buffalo Bills", "Kansas City Chiefs")]
+    pick(client, "Jimmy", "Chicago Bears", gb_chi)        # +3, covers big
+    pick(client, "Mack", "Kansas City Chiefs", kc_buf)    # -1.5, covers barely
+    client.post("/api/scores/manual",
+                json={"game_id": gb_chi, "home_score": 10, "away_score": 31})
+    client.post("/api/scores/manual",
+                json={"game_id": kc_buf, "home_score": 24, "away_score": 21})
+
+    order = [s["player"] for s in client.get("/api/standings").json()["standings"]]
+    table = {s["player"]: s for s in client.get("/api/standings").json()["standings"]}
+    assert table["Jimmy"]["record"] == table["Mack"]["record"] == "1-0"
+    assert table["Jimmy"]["margin"] == 24          # won by 21 off +3
+    assert table["Mack"]["margin"] == 1.5          # won by 3 off -1.5
+    assert order.index("Jimmy") < order.index("Mack")
+
+
+def test_the_week_and_running_totals_are_reported(client, stub_odds):
+    _graded_week(client)
+    body = client.get("/api/standings").json()
+    assert body["week_margin"]["1"]["Anthony"] == 8.5
+    assert body["running_margin"]["1"]["Anthony"] == 8.5
+    assert body["running_margin"]["1"]["Jimmy"] == 0
+
+
+def test_the_running_total_accumulates_across_weeks(client, stub_odds):
+    _graded_week(client)                                    # Anthony +8.5
+
+    stub_odds(slate(commence="2026-09-17T00:20:00Z"))
+    refresh(client, week=2)
+    ids2 = game_ids(client, week=2)
+    gb_chi2 = ids2[("Chicago Bears", "Green Bay Packers")]
+    # Week 2 leads off with Mack, then Anthony.
+    pick(client, "Mack", "Chicago Bears", gb_chi2, week=2)          # +3
+    pick(client, "Anthony", "Green Bay Packers", gb_chi2, week=2)   # -3
+    client.post("/api/scores/manual",
+                json={"game_id": gb_chi2, "home_score": 30, "away_score": 10})
+
+    body = client.get("/api/standings").json()
+    assert body["week_margin"]["2"]["Anthony"] == 17        # won by 20 off -3
+    assert body["running_margin"]["1"]["Anthony"] == 8.5
+    assert body["running_margin"]["2"]["Anthony"] == 25.5   # 8.5 carried forward
+    table = {s["player"]: s for s in body["standings"]}
+    assert table["Anthony"]["margin"] == 25.5
+
+
+def test_an_ungraded_week_contributes_nothing(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    body = client.get("/api/standings").json()
+    assert body["week_margin"] == {}
+    assert body["running_margin"] == {}
+    assert {s["player"]: s["margin"] for s in body["standings"]}["Jimmy"] == 0

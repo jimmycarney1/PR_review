@@ -106,7 +106,7 @@ async function render() {
   renderCredits(state.board.credits);
   renderTexting(state.board.texting);
   if (state.view === "draft") renderDraft();
-  if (state.view === "results") renderResults();
+  if (state.view === "results") await renderResults();
   if (state.view === "standings") await renderStandings();
   if (state.view === "ledger") await renderLedger();
 }
@@ -542,7 +542,7 @@ $("#manual-game-form").addEventListener("submit", async (event) => {
 
 /* ------------------------------------------------------------ results */
 
-function renderResults() {
+async function renderResults() {
   const board = state.board;
   const list = $("#results");
   list.replaceChildren();
@@ -552,6 +552,11 @@ function renderResults() {
     list.append(el("p", "hint", `No picks to grade in week ${board.week} yet.`));
     return;
   }
+
+  // Differential: points a pick beat its spread by. Graded games only, so an
+  // ungraded week shows nothing rather than a misleading zero.
+  const season = await api("/api/standings");
+  list.append(marginPanel(board, season));
 
   picked.forEach((game) => {
     const row = el("div", "result-row");
@@ -564,6 +569,9 @@ function renderResults() {
         if (i) picks.append(document.createTextNode(" · "));
         picks.append(document.createTextNode(`${p.player}: ${p.label} `));
         if (p.result) picks.append(el("span", `pill ${p.result}`, p.result));
+        if (p.margin !== null && p.margin !== undefined) {
+          picks.append(el("span", `diff ${marginTone(p.margin)}`, ` ${p.margin_display}`));
+        }
       });
     left.append(picks);
     row.append(left);
@@ -604,6 +612,57 @@ function renderResults() {
   });
 }
 
+const marginTone = (margin) => (margin > 0 ? "up" : margin < 0 ? "down" : "level");
+
+// This week's differential per player, and the season running total through
+// this week -- the figure the league actually argues about.
+function marginPanel(board, season) {
+  const panel = el("div", "margin-panel");
+  panel.append(el("h2", "section-title", "Point differential"));
+
+  const weekly = season.week_margin?.[board.week] ?? {};
+  const graded = season.running_margin ?? {};
+  // Through this week, not the latest week, so an older week reads correctly.
+  const throughWeek = Object.keys(graded)
+    .map(Number)
+    .filter((w) => w <= board.week)
+    .sort((a, b) => a - b)
+    .pop();
+  const running = throughWeek ? graded[throughWeek] : null;
+
+  const table = el("table", "margin-table");
+  table.innerHTML =
+    `<thead><tr><th>Player</th><th class="num">Week ${board.week}</th>` +
+    `<th class="num">Season${throughWeek && throughWeek !== board.week
+      ? ` (thru wk ${throughWeek})` : ""}</th></tr></thead>`;
+  const body = el("tbody");
+
+  board.players.forEach((player) => {
+    const week = weekly[player];
+    const total = running?.[player];
+    const tr = el("tr");
+    tr.append(el("td", null, player));
+    const weekCell = el("td", `num diff ${week === undefined ? "" : marginTone(week)}`,
+      week === undefined ? "—" : formatSpreadSigned(week));
+    const totalCell = el("td", `num diff ${total === undefined || total === null
+      ? "" : marginTone(total)}`,
+      total === undefined || total === null ? "—" : formatSpreadSigned(total));
+    tr.append(weekCell, totalCell);
+    body.append(tr);
+  });
+  table.append(body);
+  panel.append(table);
+
+  if (!Object.keys(weekly).length) {
+    panel.append(el("p", "hint", "Nothing graded this week yet — enter finals below."));
+  }
+  return panel;
+}
+
+// Mirrors rules.format_margin: a differential always carries its sign.
+const formatSpreadSigned = (value) =>
+  value > 0 ? `+${+value.toFixed(1)}` : `${+value.toFixed(1)}`;
+
 $("#grade-week").addEventListener("click", async (event) => {
   event.target.disabled = true;
   try {
@@ -636,7 +695,8 @@ async function renderStandings() {
   const table = el("table");
   table.innerHTML =
     "<thead><tr><th>Player</th><th>Record</th><th class='num'>W</th><th class='num'>L</th>" +
-    "<th class='num'>Push</th><th class='num'>Pending</th><th class='num'>Win %</th></tr></thead>";
+    "<th class='num'>Push</th><th class='num'>Pending</th><th class='num'>Win %</th>" +
+    "<th class='num' title='Points beaten the spread by, all season'>Diff</th></tr></thead>";
   const body = el("tbody");
   const best = standings[0]?.wins ?? 0;
   standings.forEach((s) => {
@@ -646,7 +706,8 @@ async function renderStandings() {
       `<td>${s.player}</td><td>${s.record}</td><td class="num">${s.wins}</td>` +
       `<td class="num">${s.losses}</td><td class="num">${s.pushes}</td>` +
       `<td class="num">${s.pending}</td>` +
-      `<td class="num">${s.win_pct == null ? "—" : s.win_pct.toFixed(3)}</td>`;
+      `<td class="num">${s.win_pct == null ? "—" : s.win_pct.toFixed(3)}</td>` +
+      `<td class="num diff ${marginTone(s.margin)}">${s.margin_display}</td>`;
     body.append(tr);
   });
   table.append(body);
@@ -670,6 +731,9 @@ async function renderStandings() {
         if (i) cell.append(el("br"));
         cell.append(document.createTextNode(`${p.display} `));
         if (p.result) cell.append(el("span", `pill ${p.result}`, p.result));
+        if (p.margin !== null && p.margin !== undefined) {
+          cell.append(el("span", `diff ${marginTone(p.margin)}`, ` ${p.margin_display}`));
+        }
       });
       if (!cell.childNodes.length) cell.textContent = "—";
       tr.append(cell);

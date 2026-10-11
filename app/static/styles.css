@@ -186,6 +186,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .pill.LOSS { background: rgba(208,92,92,.18); color: #eb9a9a; }
 .pill.PUSH { background: rgba(127,143,160,.2); color: #b7c4cf; }
 
+/* A differential reads as a quantity, not a verdict -- quieter than the pills. */
+.diff { font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 650; }
+.diff.up { color: #7fd68d; }
+.diff.down { color: #eb9a9a; }
+.diff.level { color: var(--push); }
+
+.margin-panel { margin-bottom: 20px; }
+.margin-table { max-width: 440px; }
+.margin-table .diff { font-size: 14px; }
+
 /* ---------------------------------------------------- tables & ledger */
 
 table { width: 100%; border-collapse: collapse; margin-top: 14px; }
@@ -281,4 +291,8 @@ dialog menu .danger { margin-right: auto; }
   /* Side-by-side, a long team name and its reason collide with the number. */
   .side .why { display: block; margin-top: 2px; }
   .side .num { white-space: nowrap; }
+  /* A matchup and its score boxes will not share a phone's width. */
+  .result-row { grid-template-columns: 1fr; }
+  .score-form { justify-content: flex-start; }
+  .score-form input { flex: 1; max-width: 90px; }
 }

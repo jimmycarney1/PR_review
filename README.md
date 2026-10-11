@@ -47,6 +47,13 @@ Only the most recent pick in a week can be removed, which keeps the snake intact
 **Grading.** `margin + spread > 0` wins, `< 0` loses, exactly `0` pushes. Pushes
 are tracked separately and don't count toward win percentage.
 
+**Point differential.** That same `margin + spread` is kept as a number, not
+just a verdict: take a team at -3 and win by 6 and the pick is **+3**; lose by
+3 off that same -3 and it is **-6**. The results page shows each pick's
+differential, the week's total per player, and the running season total; the
+standings carry it as a column and use it to break a tie on record. Both come
+from one function, so a differential and its W/L can never disagree.
+
 ## Running it
 
 ```bash

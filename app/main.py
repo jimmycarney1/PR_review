@@ -91,6 +91,8 @@ def _picks_for_week(conn, week: int) -> list[dict]:
     for row in rows:
         pick = dict(row)
         pick["result"] = rules.grade_pick(pick["team"], pick["spread"], pick)
+        pick["margin"] = rules.cover_margin(pick["team"], pick["spread"], pick)
+        pick["margin_display"] = rules.format_margin(pick["margin"])
         pick["label"] = f"{pick['team']} {rules.format_spread(pick['spread'])}"
         picks.append(pick)
     return picks
@@ -559,24 +561,36 @@ def standings(conn=Depends(db)):
              FROM picks p JOIN games g ON g.id = p.game_id ORDER BY p.week, p.slot"""
     ).fetchall()
 
-    table = {name: {"player": name, "wins": 0, "losses": 0, "pushes": 0, "pending": 0}
-             for name in rules.PLAYERS}
+    def fresh(name):
+        return {"player": name, "wins": 0, "losses": 0, "pushes": 0,
+                "pending": 0, "margin": 0.0}
+
+    table = {name: fresh(name) for name in rules.PLAYERS}
     weekly: dict[int, dict] = {}
+    # Week-by-week differential per player, carried forward into a running total.
+    week_margin: dict[int, dict[str, float]] = {}
+
     for row in rows:
         pick = dict(row)
         result = rules.grade_pick(pick["team"], pick["spread"], pick)
-        bucket = table.setdefault(
-            pick["player"],
-            {"player": pick["player"], "wins": 0, "losses": 0, "pushes": 0, "pending": 0},
-        )
+        margin = rules.cover_margin(pick["team"], pick["spread"], pick)
+        bucket = table.setdefault(pick["player"], fresh(pick["player"]))
         key = {"WIN": "wins", "LOSS": "losses", "PUSH": "pushes", None: "pending"}[result]
         bucket[key] += 1
+        if margin is not None:
+            bucket["margin"] += margin
+            week_margin.setdefault(pick["week"], {})[pick["player"]] = (
+                week_margin.setdefault(pick["week"], {}).get(pick["player"], 0.0) + margin
+            )
+
         week = weekly.setdefault(pick["week"], {name: [] for name in rules.PLAYERS})
         week.setdefault(pick["player"], []).append(
             {
                 "team": pick["team"],
                 "display": f"{pick['team']} {rules.format_spread(pick['spread'])}",
                 "result": result,
+                "margin": margin,
+                "margin_display": rules.format_margin(margin),
             }
         )
 
@@ -586,11 +600,31 @@ def standings(conn=Depends(db)):
         bucket["record"] = f"{bucket['wins']}-{bucket['losses']}" + (
             f"-{bucket['pushes']}" if bucket["pushes"] else ""
         )
+        bucket["margin"] = round(bucket["margin"], 1)
+        bucket["margin_display"] = rules.format_margin(bucket["margin"])
 
+    # Wins first, then differential -- it is the natural tiebreak, and the
+    # reason for tracking it at all.
     order = sorted(
-        table.values(), key=lambda b: (b["wins"], -b["losses"]), reverse=True
+        table.values(), key=lambda b: (b["wins"], -b["losses"], b["margin"]), reverse=True
     )
-    return {"standings": order, "weekly": weekly}
+
+    # Running season differential after each week, so the results page can show
+    # where everyone stood at that point rather than only the final figure.
+    running: dict[int, dict[str, float]] = {}
+    carried = {name: 0.0 for name in table}
+    for week_no in sorted(week_margin):
+        for name in carried:
+            carried[name] += week_margin[week_no].get(name, 0.0)
+        running[week_no] = {n: round(v, 1) for n, v in carried.items()}
+
+    return {
+        "standings": order,
+        "weekly": weekly,
+        "week_margin": {w: {n: round(v, 1) for n, v in m.items()}
+                        for w, m in week_margin.items()},
+        "running_margin": running,
+    }
 
 
 @app.get("/api/ledger")

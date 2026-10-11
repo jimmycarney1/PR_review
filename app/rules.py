@@ -147,8 +147,13 @@ def validate_pick(
             )
 
 
-def grade_pick(team: str, spread: float, game: dict) -> str | None:
-    """Result of one pick against the spread, or None if the game has no final."""
+def cover_margin(team: str, spread: float, game: dict) -> float | None:
+    """Points a pick beat its spread by, or None if the game has no final.
+
+    Take a team at -3 and win by 6 and the pick is +3 to the good; lose by 3
+    off that same -3 and it is -6. Positive covers, negative does not, and the
+    size says by how much -- so two 1-1 weeks can still be told apart.
+    """
     home, away = game.get("home_score"), game.get("away_score")
     if home is None or away is None or not game.get("completed"):
         return None
@@ -158,12 +163,26 @@ def grade_pick(team: str, spread: float, game: dict) -> str | None:
         margin = away - home
     else:
         raise ValueError(f"{team} is not in this game")
-    adjusted = margin + spread
-    if adjusted > 0:
+    return margin + spread
+
+
+def grade_pick(team: str, spread: float, game: dict) -> str | None:
+    """Result of one pick against the spread, or None if the game has no final."""
+    margin = cover_margin(team, spread, game)
+    if margin is None:
+        return None
+    if margin > 0:
         return "WIN"
-    if adjusted < 0:
+    if margin < 0:
         return "LOSS"
     return "PUSH"
+
+
+def format_margin(margin: float | None) -> str:
+    """A differential always carries its sign, including zero on a push."""
+    if margin is None:
+        return "—"
+    return f"{margin:+g}" if margin else "0"
 
 
 def format_spread(spread: float) -> str:
