@@ -678,3 +678,134 @@ def test_an_ungraded_week_contributes_nothing(client, stub_odds):
     assert body["week_margin"] == {}
     assert body["running_margin"] == {}
     assert {s["player"]: s["margin"] for s in body["standings"]}["Jimmy"] == 0
+
+
+# One game per slot, so a slot's outcome can be set without tripping the
+# both-sides rule -- the snake hands slots 3 and 4 to the same player.
+SLOT_GAMES = [
+    ("Green Bay Packers", "Chicago Bears"),
+    ("Kansas City Chiefs", "Buffalo Bills"),
+    ("Dallas Cowboys", "Philadelphia Eagles"),
+    ("Baltimore Ravens", "Cincinnati Bengals"),
+    ("San Francisco 49ers", "Seattle Seahawks"),
+    ("Detroit Lions", "Minnesota Vikings"),
+]
+
+
+def _draft_full_week(client, week, finals):
+    """Draft all six slots in `week`, each taking a -3 home favourite.
+
+    `finals` maps a slot (1-6) to its home margin: +7 covers, -7 does not,
+    +3 is a push. A slot left out of `finals` stays ungraded.
+    """
+    games = [
+        client.post("/api/games/manual",
+                    json={"week": week, "home_team": home, "away_team": away}).json()["game_id"]
+        for home, away in SLOT_GAMES
+    ]
+    order = client.get("/api/board", params={"week": week}).json()["draft_order"]
+
+    for slot, player in enumerate(order, start=1):
+        home = SLOT_GAMES[slot - 1][0]
+        r = pick(client, player, home, games[slot - 1], week=week,
+                 override_spread=-3, override_reason="test slate")
+        assert r.status_code == 200, r.text
+        assert r.json()["slot"] == slot
+
+    for slot, home_margin in finals.items():
+        client.post("/api/scores/manual", json={
+            "game_id": games[slot - 1],
+            "home_score": 20 + home_margin, "away_score": 20})
+    return games
+
+
+# Every slot's favourite covers by 4, except where a test says otherwise.
+ALL_COVER = {slot: 7 for slot in range(1, 7)}
+
+
+def test_analytics_is_empty_before_anything_is_graded(client, stub_odds):
+    body = client.get("/api/analytics").json()
+    assert body["weeks_graded"] == 0
+    assert body["weeks_drafted"] == 0
+    assert [s["slot"] for s in body["by_slot"]] == [1, 2, 3, 4, 5, 6]
+    assert all(s["graded"] == 0 for s in body["by_slot"])
+    assert all(s["avg_margin"] is None for s in body["by_slot"])
+
+
+def test_every_slot_is_reported_even_when_unused(client, stub_odds):
+    refresh(client)
+    ids = game_ids(client)
+    pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    body = client.get("/api/analytics").json()
+    assert len(body["by_slot"]) == 6
+    assert body["by_slot"][0]["pending"] == 1
+    assert body["by_slot"][1]["graded"] == 0
+
+
+def test_slot_records_add_up_across_weeks(client, stub_odds):
+    # Slots 1-2 cover by 4 each week, slot 3 misses by 10, slot 4 pushes.
+    finals = {1: 7, 2: 7, 3: -7, 4: 3, 5: 7, 6: -7}
+    _draft_full_week(client, 1, finals)
+    _draft_full_week(client, 2, finals)
+
+    body = client.get("/api/analytics").json()
+    assert body["weeks_graded"] == 2
+    assert body["weeks_drafted"] == 2
+
+    by_slot = {s["slot"]: s for s in body["by_slot"]}
+    assert by_slot[1]["record"] == "2-0"
+    assert by_slot[1]["margin"] == 8          # +4 a week
+    assert by_slot[1]["avg_margin"] == 4
+    assert by_slot[3]["record"] == "0-2"
+    assert by_slot[3]["margin"] == -20        # -10 a week
+    assert by_slot[4]["record"] == "0-0-2"    # a 3-point win off -3
+    assert by_slot[4]["margin"] == 0
+
+
+def test_every_graded_pick_lands_in_exactly_one_slot(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    body = client.get("/api/analytics").json()
+    counted = sum(s["graded"] for s in body["by_slot"])
+    standings = client.get("/api/standings").json()["standings"]
+    expected = sum(p["wins"] + p["losses"] + p["pushes"] for p in standings)
+    assert counted == expected == 6
+
+
+def test_slot_totals_match_the_halves(client, stub_odds):
+    _draft_full_week(client, 1, {1: 7, 2: -7, 3: 3, 4: 7, 5: -7, 6: 3})
+    body = client.get("/api/analytics").json()
+    by_slot = {s["slot"]: s for s in body["by_slot"]}
+    halves = {h["half"]: h for h in body["by_half"]}
+    assert halves["first"]["margin"] == sum(by_slot[s]["margin"] for s in (1, 2, 3))
+    assert halves["second"]["margin"] == sum(by_slot[s]["margin"] for s in (4, 5, 6))
+    assert halves["first"]["graded"] + halves["second"]["graded"] == 6
+
+
+def test_the_player_grid_follows_the_rotating_snake(client, stub_odds):
+    """Week 1 gives Jimmy slots 1 and 6; week 2 gives him 3 and 4."""
+    _draft_full_week(client, 1, ALL_COVER)
+    _draft_full_week(client, 2, ALL_COVER)
+
+    grid = client.get("/api/analytics").json()["by_player_slot"]
+    jimmy = {cell["slot"]: cell for cell in grid["Jimmy"]}
+    assert jimmy[1]["graded"] == 1 and jimmy[6]["graded"] == 1      # week 1
+    assert jimmy[3]["graded"] == 1 and jimmy[4]["graded"] == 1      # week 2
+    assert jimmy[2]["graded"] == 0 and jimmy[5]["graded"] == 0
+
+    # Each slot's totals are the three players' cells for that slot.
+    by_slot = {s["slot"]: s for s in client.get("/api/analytics").json()["by_slot"]}
+    for slot in range(1, 7):
+        per_player = sum(
+            next(c for c in grid[p] if c["slot"] == slot)["graded"]
+            for p in grid
+        )
+        assert per_player == by_slot[slot]["graded"]
+
+
+def test_a_slot_with_no_graded_picks_has_no_average(client, stub_odds):
+    _draft_full_week(client, 1, {1: 7})             # only slot 1 has a final
+    by_slot = {s["slot"]: s for s in client.get("/api/analytics").json()["by_slot"]}
+    assert by_slot[1]["graded"] == 1
+    assert by_slot[5]["graded"] == 0
+    assert by_slot[5]["avg_margin"] is None
+    assert by_slot[5]["avg_margin_display"] == "—"

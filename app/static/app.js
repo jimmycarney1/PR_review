@@ -108,6 +108,7 @@ async function render() {
   if (state.view === "draft") renderDraft();
   if (state.view === "results") await renderResults();
   if (state.view === "standings") await renderStandings();
+  if (state.view === "analytics") await renderAnalytics();
   if (state.view === "ledger") await renderLedger();
 }
 
@@ -742,6 +743,140 @@ async function renderStandings() {
   });
   grid.append(gridBody);
   box.append(el("h2", "section-title", "Week by week"), grid);
+}
+
+/* ---------------------------------------------------------- analytics */
+
+async function renderAnalytics() {
+  const data = await api("/api/analytics");
+  const box = $("#analytics");
+  box.replaceChildren();
+
+  if (!data.weeks_graded) {
+    box.append(el("p", "hint", data.weeks_drafted
+      ? "Nothing graded yet — enter some finals on the Results tab."
+      : "No picks yet."));
+    return;
+  }
+
+  box.append(el("p", "hint",
+    `Draft position across ${data.weeks_graded} graded week${data.weeks_graded === 1 ? "" : "s"}. ` +
+    `The snake rotates, so everyone cycles through the same slot pairs — ` +
+    `picks 1 and 6, 2 and 5, 3 and 4 — which makes these comparable.`));
+
+  box.append(el("h2", "section-title", "By draft position"));
+  box.append(slotTable(data.by_slot));
+  box.append(marginChart(data.by_slot));
+  box.append(el("h2", "section-title", "Opening three vs the snake back"));
+  box.append(halfTable(data.by_half));
+  box.append(el("h2", "section-title", "Each player by position"));
+  const scroller = el("div", "table-scroll");
+  scroller.append(playerSlotTable(data));
+  box.append(scroller);
+}
+
+function slotTable(slots) {
+  const table = el("table");
+  table.innerHTML =
+    "<thead><tr><th>Pick</th><th>Record</th><th class='num'>Win %</th>" +
+    "<th class='num' title='Total points beaten the spread by'>Diff</th>" +
+    "<th class='num' title='Differential per graded pick'>Avg</th></tr></thead>";
+  const body = el("tbody");
+  slots.forEach((s) => {
+    const tr = el("tr");
+    tr.innerHTML =
+      `<td>Pick ${s.slot}</td><td>${s.record}</td>` +
+      `<td class="num">${s.win_pct == null ? "—" : s.win_pct.toFixed(3)}</td>` +
+      `<td class="num diff ${marginTone(s.margin)}">${s.margin_display}</td>` +
+      `<td class="num diff ${marginTone(s.avg_margin ?? 0)}">${s.avg_margin_display}</td>`;
+    body.append(tr);
+  });
+  table.append(body);
+  return table;
+}
+
+function halfTable(halves) {
+  const names = { first: "Picks 1–3", second: "Picks 4–6" };
+  const table = el("table");
+  table.innerHTML =
+    "<thead><tr><th>Half of the round</th><th>Record</th><th class='num'>Win %</th>" +
+    "<th class='num'>Diff</th><th class='num'>Avg</th></tr></thead>";
+  const body = el("tbody");
+  halves.forEach((h) => {
+    const tr = el("tr");
+    tr.innerHTML =
+      `<td>${names[h.half]}</td><td>${h.record}</td>` +
+      `<td class="num">${h.win_pct == null ? "—" : h.win_pct.toFixed(3)}</td>` +
+      `<td class="num diff ${marginTone(h.margin)}">${h.margin_display}</td>` +
+      `<td class="num diff ${marginTone(h.avg_margin ?? 0)}">${h.avg_margin_display}</td>`;
+    body.append(tr);
+  });
+  table.append(body);
+  return table;
+}
+
+/* Differential per pick by draft slot.
+   Polarity is the job, so this is a diverging form anchored at zero. Direction
+   is carried by which side of the baseline a bar sits on and by a signed label
+   on every bar -- never by colour alone, which greens and reds cannot do for a
+   red-green colourblind reader (the pair measures dE 1.3 under deuteranopia). */
+function marginChart(slots) {
+  const figure = el("figure", "chart");
+  figure.append(el("figcaption", "chart-title", "Differential per pick, by draft position"));
+
+  const values = slots.map((s) => s.avg_margin ?? 0);
+  const bound = Math.max(1, ...values.map(Math.abs));
+
+  const plot = el("div", "chart-plot");
+  slots.forEach((s) => {
+    const value = s.avg_margin ?? 0;
+    const row = el("div", "chart-row");
+    row.append(el("div", "chart-label", `Pick ${s.slot}`));
+
+    const track = el("div", "chart-track");
+    track.append(el("div", "chart-zero"));
+    const bar = el("div", `chart-bar ${marginTone(value)}`);
+    // Half the track is each polarity; the bar grows out from the centre.
+    const extent = (Math.abs(value) / bound) * 50;
+    bar.style.width = `${extent}%`;
+    if (value < 0) bar.style.right = "50%";
+    else bar.style.left = "50%";
+    bar.title = `Pick ${s.slot}: ${s.record}, ${s.avg_margin_display} per pick ` +
+                `(${s.margin_display} over ${s.graded} graded)`;
+    track.append(bar);
+    row.append(track);
+    row.append(el("div", `chart-value diff ${marginTone(value)}`, s.avg_margin_display));
+    plot.append(row);
+  });
+
+  figure.append(plot);
+  figure.append(el("p", "chart-note",
+    "Bars run left of the centre line for under, right for over. The table above carries the same numbers."));
+  return figure;
+}
+
+function playerSlotTable(data) {
+  const table = el("table");
+  const heads = Array.from({ length: data.slots }, (_, i) => `<th class="num">Pick ${i + 1}</th>`);
+  table.innerHTML = `<thead><tr><th>Player</th>${heads.join("")}</tr></thead>`;
+  const body = el("tbody");
+  data.players.forEach((player) => {
+    const tr = el("tr");
+    tr.append(el("td", null, player));
+    (data.by_player_slot[player] || []).forEach((cell) => {
+      const td = el("td", "num");
+      if (!cell.graded) {
+        td.textContent = "—";
+      } else {
+        td.append(document.createTextNode(cell.record + " "));
+        td.append(el("span", `diff ${marginTone(cell.margin)}`, cell.margin_display));
+      }
+      tr.append(td);
+    });
+    body.append(tr);
+  });
+  table.append(body);
+  return table;
 }
 
 /* ------------------------------------------------------------- ledger */

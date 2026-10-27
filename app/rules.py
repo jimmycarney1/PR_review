@@ -178,6 +178,34 @@ def grade_pick(team: str, spread: float, game: dict) -> str | None:
     return "PUSH"
 
 
+def new_tally(**labels) -> dict:
+    """A blank record. `labels` identify what is being counted (a player, a slot)."""
+    return {**labels, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "margin": 0.0}
+
+
+def add_to_tally(tally: dict, result: str | None, margin: float | None) -> None:
+    tally[{"WIN": "wins", "LOSS": "losses", "PUSH": "pushes", None: "pending"}[result]] += 1
+    if margin is not None:
+        tally["margin"] += margin
+
+
+def finish_tally(tally: dict) -> dict:
+    """Derive the read-out fields once every pick has been counted in."""
+    decided = tally["wins"] + tally["losses"]
+    graded = decided + tally["pushes"]
+    tally["graded"] = graded
+    tally["win_pct"] = round(tally["wins"] / decided, 3) if decided else None
+    tally["record"] = f"{tally['wins']}-{tally['losses']}" + (
+        f"-{tally['pushes']}" if tally["pushes"] else ""
+    )
+    tally["margin"] = round(tally["margin"], 1)
+    tally["margin_display"] = format_margin(tally["margin"])
+    # Per-pick average, so slots with different numbers of graded picks compare.
+    tally["avg_margin"] = round(tally["margin"] / graded, 2) if graded else None
+    tally["avg_margin_display"] = format_margin(tally["avg_margin"])
+    return tally
+
+
 def format_margin(margin: float | None) -> str:
     """A differential always carries its sign, including zero on a push."""
     if margin is None:

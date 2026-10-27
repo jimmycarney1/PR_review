@@ -164,6 +164,22 @@ The header pill reads "texts off" when nothing is configured, "texts failing"
 when the last attempt bounced, and "texts on" only when the last one landed --
 so a misconfiguration shows up on the page rather than as missing texts.
 
+## Analytics
+
+An Analytics tab asks whether draft position matters: each slot's record, win
+percentage, total differential and differential per graded pick, plus the
+opening three against the snake coming back, and a grid of each player by
+position.
+
+Slot records are comparable because the snake rotates -- every player cycles
+through the same slot pairs, picks 1 and 6, 2 and 5, 3 and 4 -- so a slot's
+figures are not an artefact of who happened to pick there.
+
+The differential chart is diverging, anchored at zero. Direction is carried by
+which side of the baseline a bar sits on and by a signed label on every bar,
+never by colour alone: the green/red pair measures ΔE 1.3 under deuteranopia,
+which is indistinguishable to a red-green colourblind reader.
+
 ## Layout
 
 ```

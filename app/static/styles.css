@@ -62,7 +62,9 @@ body {
 .credits strong { color: var(--ink); }
 .credits.low strong { color: var(--gold); }
 
-.tabs { display: flex; gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--line);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
   background: none; border: 0; border-bottom: 2px solid transparent;
   color: var(--ink-dim); font: inherit; padding: 11px 15px; cursor: pointer;
@@ -195,6 +197,41 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .margin-panel { margin-bottom: 20px; }
 .margin-table { max-width: 440px; }
 .margin-table .diff { font-size: 14px; }
+
+/* A table too wide for the screen scrolls itself; the page never does. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 460px; }
+
+/* ------------------------------------------------------------- charts */
+
+.chart { margin: 18px 0 26px; padding: 0; }
+.chart-title { font-size: 13.5px; color: var(--ink); margin-bottom: 12px; }
+.chart-plot { display: grid; gap: 7px; max-width: 620px; }
+
+.chart-row { display: grid; grid-template-columns: 58px 1fr 56px; gap: 10px; align-items: center; }
+.chart-label { font-size: 12.5px; color: var(--ink-dim); }
+
+.chart-track { position: relative; height: 20px; }
+/* Recessive baseline: it orients the eye without competing with the bars. */
+.chart-zero { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
+  background: var(--line); }
+.chart-bar { position: absolute; top: 3px; bottom: 3px; min-width: 2px;
+  border-radius: 4px; }
+/* Square off the end that meets the baseline, round the end that carries the value. */
+.chart-bar.up { background: var(--turf); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.chart-bar.down { background: var(--loss); border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.chart-bar.level { background: var(--push); }
+
+.chart-value { text-align: right; font-size: 13px; }
+.chart-note { font-size: 12px; color: var(--push); margin: 10px 0 0; max-width: 620px; }
+
+@media (max-width: 560px) {
+  .chart-row { grid-template-columns: 50px 1fr 48px; gap: 7px; }
+  .chart-value { font-size: 12px; }
+  /* Five tabs do not fit a phone at full padding. */
+  .tabs { padding: 0 12px; }
+  .tab { padding: 11px 9px; font-size: 14px; }
+}
 
 /* ---------------------------------------------------- tables & ledger */
 

@@ -561,11 +561,7 @@ def standings(conn=Depends(db)):
              FROM picks p JOIN games g ON g.id = p.game_id ORDER BY p.week, p.slot"""
     ).fetchall()
 
-    def fresh(name):
-        return {"player": name, "wins": 0, "losses": 0, "pushes": 0,
-                "pending": 0, "margin": 0.0}
-
-    table = {name: fresh(name) for name in rules.PLAYERS}
+    table = {name: rules.new_tally(player=name) for name in rules.PLAYERS}
     weekly: dict[int, dict] = {}
     # Week-by-week differential per player, carried forward into a running total.
     week_margin: dict[int, dict[str, float]] = {}
@@ -574,11 +570,9 @@ def standings(conn=Depends(db)):
         pick = dict(row)
         result = rules.grade_pick(pick["team"], pick["spread"], pick)
         margin = rules.cover_margin(pick["team"], pick["spread"], pick)
-        bucket = table.setdefault(pick["player"], fresh(pick["player"]))
-        key = {"WIN": "wins", "LOSS": "losses", "PUSH": "pushes", None: "pending"}[result]
-        bucket[key] += 1
+        bucket = table.setdefault(pick["player"], rules.new_tally(player=pick["player"]))
+        rules.add_to_tally(bucket, result, margin)
         if margin is not None:
-            bucket["margin"] += margin
             week_margin.setdefault(pick["week"], {})[pick["player"]] = (
                 week_margin.setdefault(pick["week"], {}).get(pick["player"], 0.0) + margin
             )
@@ -595,13 +589,7 @@ def standings(conn=Depends(db)):
         )
 
     for bucket in table.values():
-        decided = bucket["wins"] + bucket["losses"]
-        bucket["win_pct"] = round(bucket["wins"] / decided, 3) if decided else None
-        bucket["record"] = f"{bucket['wins']}-{bucket['losses']}" + (
-            f"-{bucket['pushes']}" if bucket["pushes"] else ""
-        )
-        bucket["margin"] = round(bucket["margin"], 1)
-        bucket["margin_display"] = rules.format_margin(bucket["margin"])
+        rules.finish_tally(bucket)
 
     # Wins first, then differential -- it is the natural tiebreak, and the
     # reason for tracking it at all.
@@ -624,6 +612,65 @@ def standings(conn=Depends(db)):
         "week_margin": {w: {n: round(v, 1) for n, v in m.items()}
                         for w, m in week_margin.items()},
         "running_margin": running,
+    }
+
+
+@app.get("/api/analytics")
+def analytics(conn=Depends(db)):
+    """How each draft position has fared across the season.
+
+    The snake rotates, so every player cycles through the same slot pairs --
+    (1,6), (2,5), (3,4) -- which makes slot records comparable rather than an
+    artefact of who happened to pick there.
+    """
+    rows = conn.execute(
+        """SELECT p.week, p.slot, p.player, p.team, p.spread,
+                  g.home_team, g.away_team, g.home_score, g.away_score, g.completed
+             FROM picks p JOIN games g ON g.id = p.game_id ORDER BY p.week, p.slot"""
+    ).fetchall()
+
+    by_slot = {slot: rules.new_tally(slot=slot)
+               for slot in range(1, rules.SLOTS_PER_WEEK + 1)}
+    by_player_slot = {
+        player: {slot: rules.new_tally(player=player, slot=slot)
+                 for slot in range(1, rules.SLOTS_PER_WEEK + 1)}
+        for player in rules.PLAYERS
+    }
+    # Picks 1-3 open the round; 4-6 are the snake coming back.
+    by_half = {"first": rules.new_tally(half="first"), "second": rules.new_tally(half="second")}
+    weeks, graded_weeks = set(), set()
+
+    for row in rows:
+        pick = dict(row)
+        result = rules.grade_pick(pick["team"], pick["spread"], pick)
+        margin = rules.cover_margin(pick["team"], pick["spread"], pick)
+        slot, player = pick["slot"], pick["player"]
+        weeks.add(pick["week"])
+        if result is not None:
+            graded_weeks.add(pick["week"])
+
+        rules.add_to_tally(by_slot[slot], result, margin)
+        rules.add_to_tally(by_half["first" if slot <= 3 else "second"], result, margin)
+        if player in by_player_slot:
+            rules.add_to_tally(by_player_slot[player][slot], result, margin)
+
+    for tally in by_slot.values():
+        rules.finish_tally(tally)
+    for tally in by_half.values():
+        rules.finish_tally(tally)
+    for slots in by_player_slot.values():
+        for tally in slots.values():
+            rules.finish_tally(tally)
+
+    return {
+        "by_slot": [by_slot[s] for s in sorted(by_slot)],
+        "by_half": [by_half["first"], by_half["second"]],
+        "by_player_slot": {p: [by_player_slot[p][s] for s in sorted(by_player_slot[p])]
+                           for p in by_player_slot},
+        "players": rules.PLAYERS,
+        "slots": rules.SLOTS_PER_WEEK,
+        "weeks_drafted": len(weeks),
+        "weeks_graded": len(graded_weeks),
     }
 
 
