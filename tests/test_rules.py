@@ -273,3 +273,30 @@ def test_a_big_loss_hurts_more_than_a_narrow_one():
               "home_score": 20, "away_score": 24, "completed": 1}
     assert rules.grade_pick("A", -3, blowout) == rules.grade_pick("A", -3, narrow) == "LOSS"
     assert rules.cover_margin("A", -3, blowout) < rules.cover_margin("A", -3, narrow)
+
+
+def test_a_span_reads_the_way_a_person_would_say_it():
+    assert rules.format_duration(11 / 60) == "11s"
+    assert rules.format_duration(3) == "3m"
+    assert rules.format_duration(60) == "1h"
+    assert rules.format_duration(135) == "2h 15m"
+    assert rules.format_duration(60 * 24) == "1d"
+    assert rules.format_duration(60 * 33) == "1d 9h"
+    assert rules.format_duration(None) == "—"
+
+
+def test_median_resists_one_overnight_wait():
+    """The reason response times are reported as a median, not a mean."""
+    waits = [2, 3, 4, 5, 900]
+    assert rules.median(waits) == 4
+    assert sum(waits) / len(waits) > 180      # a mean would say three hours
+
+
+def test_median_handles_an_even_count_and_an_empty_one():
+    assert rules.median([2, 6]) == 4
+    assert rules.median([]) is None
+
+
+def test_time_running_backwards_is_rejected():
+    assert rules.minutes_between("2026-10-27T15:00:00Z", "2026-10-27T16:00:00Z") == 60
+    assert rules.minutes_between("2026-10-27T16:00:00Z", "2026-10-27T15:00:00Z") is None

@@ -178,6 +178,41 @@ def grade_pick(team: str, spread: float, game: dict) -> str | None:
     return "PUSH"
 
 
+def minutes_between(earlier: str, later: str) -> float | None:
+    """Minutes from one timestamp to another, or None if they run backwards."""
+    delta = (parse_iso(later) - parse_iso(earlier)).total_seconds() / 60
+    return delta if delta >= 0 else None
+
+
+def median(values: list[float]) -> float | None:
+    """Middle value. Response times are long-tailed -- one overnight wait would
+    drag a mean somewhere no one actually picks."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def format_duration(minutes: float | None) -> str:
+    """A span at the precision a person would say it in."""
+    if minutes is None:
+        return "—"
+    seconds = minutes * 60
+    if seconds < 60:
+        return f"{round(seconds)}s"
+    if minutes < 60:
+        return f"{round(minutes)}m"
+    if minutes < 60 * 24:
+        hours, mins = divmod(round(minutes), 60)
+        return f"{hours}h" if not mins else f"{hours}h {mins}m"
+    days, rest = divmod(round(minutes), 60 * 24)
+    hours = rest // 60
+    return f"{days}d" if not hours else f"{days}d {hours}h"
+
+
 def new_tally(**labels) -> dict:
     """A blank record. `labels` identify what is being counted (a player, a slot)."""
     return {**labels, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "margin": 0.0}

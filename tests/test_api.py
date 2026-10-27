@@ -809,3 +809,111 @@ def test_a_slot_with_no_graded_picks_has_no_average(client, stub_odds):
     assert by_slot[5]["graded"] == 0
     assert by_slot[5]["avg_margin"] is None
     assert by_slot[5]["avg_margin_display"] == "—"
+
+
+def _set_pick_times(week, times):
+    """Rewrite created_at for a week's picks. `times` maps slot -> ISO string."""
+    conn = db_module.connect()
+    for slot, when in times.items():
+        conn.execute("UPDATE picks SET created_at = ? WHERE week = ? AND slot = ?",
+                     (when, week, slot))
+    conn.commit()
+    conn.close()
+
+
+# Week 1 runs Jimmy, Mack, Anthony | Anthony, Mack, Jimmy. Slot 4 is Anthony
+# again, straight after his slot 3.
+WEEK1_TIMES = {
+    1: "2026-09-08T10:00:00+00:00",   # Jimmy opens -- nothing put him on the clock
+    2: "2026-09-08T10:05:00+00:00",   # Mack waited 5m
+    3: "2026-09-08T10:20:00+00:00",   # Anthony waited 15m
+    4: "2026-09-08T10:21:00+00:00",   # Anthony again, 1m -- the snake turning
+    5: "2026-09-08T11:26:00+00:00",   # Mack waited 65m
+    6: "2026-09-08T11:28:00+00:00",   # Jimmy waited 2m
+}
+
+
+def test_time_on_the_clock_is_measured_from_the_previous_pick(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    _set_pick_times(1, WEEK1_TIMES)
+
+    clock = client.get("/api/analytics").json()["on_the_clock"]
+    by_player = {p["player"]: p for p in clock["players"]}
+
+    # Mack was handed the clock twice: 5m and 60m.
+    assert by_player["Mack"]["picks"] == 2
+    assert by_player["Mack"]["median"] == "35m"      # midpoint of 5 and 65
+    assert by_player["Mack"]["fastest"] == "5m"
+    assert by_player["Mack"]["slowest"] == "1h 5m"
+    assert by_player["Anthony"]["picks"] == 1
+    assert by_player["Anthony"]["median"] == "15m"
+    assert by_player["Jimmy"]["picks"] == 1
+    assert by_player["Jimmy"]["median"] == "2m"
+
+
+def test_the_first_pick_of_a_week_is_never_counted(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    _set_pick_times(1, WEEK1_TIMES)
+    clock = client.get("/api/analytics").json()["on_the_clock"]
+    # Six picks, but only four handoffs: slot 1 opens, slot 4 is the snake turn.
+    assert clock["handoffs_counted"] == 4
+    by_player = {p["player"]: p for p in clock["players"]}
+    assert by_player["Jimmy"]["picks"] == 1          # his slot 1 is excluded
+
+
+def test_the_snake_turn_is_never_counted(client, stub_odds):
+    """Slot 4 goes straight back to whoever took slot 3, seconds later."""
+    _draft_full_week(client, 1, ALL_COVER)
+    times = {**WEEK1_TIMES, 4: "2026-09-08T10:20:05+00:00"}   # 5 seconds later
+    _set_pick_times(1, times)
+
+    clock = client.get("/api/analytics").json()["on_the_clock"]
+    by_player = {p["player"]: p for p in clock["players"]}
+    # Anthony keeps only his slot 3 handoff; the 5-second slot 4 is ignored.
+    assert by_player["Anthony"]["picks"] == 1
+    assert by_player["Anthony"]["median"] == "15m"
+    assert by_player["Anthony"]["fastest"] == "15m"
+
+
+def test_the_slowest_pick_says_where_it_happened(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    _set_pick_times(1, WEEK1_TIMES)
+    by_player = {p["player"]: p for p in
+                 client.get("/api/analytics").json()["on_the_clock"]["players"]}
+    worst = by_player["Mack"]["slowest_detail"]
+    assert worst["week"] == 1 and worst["slot"] == 5
+    assert worst["display"] == "1h 5m"
+
+
+def test_the_league_median_spans_every_handoff(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    _set_pick_times(1, WEEK1_TIMES)
+    clock = client.get("/api/analytics").json()["on_the_clock"]
+    # Waits of 5, 15, 60 and 2 minutes -> midpoint of 5 and 15.
+    assert clock["league_median_minutes"] == 10
+    assert clock["league_median"] == "10m"
+
+
+def test_handoffs_accumulate_across_weeks(client, stub_odds):
+    _draft_full_week(client, 1, ALL_COVER)
+    _set_pick_times(1, WEEK1_TIMES)
+    _draft_full_week(client, 2, ALL_COVER)
+    _set_pick_times(2, {
+        1: "2026-09-15T10:00:00+00:00", 2: "2026-09-15T10:10:00+00:00",
+        3: "2026-09-15T10:12:00+00:00", 4: "2026-09-15T10:13:00+00:00",
+        5: "2026-09-15T10:20:00+00:00", 6: "2026-09-15T10:30:00+00:00",
+    })
+    clock = client.get("/api/analytics").json()["on_the_clock"]
+    assert clock["handoffs_counted"] == 8        # four per week
+
+
+def test_timing_is_absent_until_there_is_a_handoff(client, stub_odds):
+    body = client.get("/api/analytics").json()
+    assert body["on_the_clock"]["handoffs_counted"] == 0
+    assert body["on_the_clock"]["league_median"] == "—"
+
+    refresh(client)
+    ids = game_ids(client)
+    pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
+    # One pick is nobody's handoff.
+    assert client.get("/api/analytics").json()["on_the_clock"]["handoffs_counted"] == 0

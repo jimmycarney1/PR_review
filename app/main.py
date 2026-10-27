@@ -624,7 +624,7 @@ def analytics(conn=Depends(db)):
     artefact of who happened to pick there.
     """
     rows = conn.execute(
-        """SELECT p.week, p.slot, p.player, p.team, p.spread,
+        """SELECT p.week, p.slot, p.player, p.team, p.spread, p.created_at,
                   g.home_team, g.away_team, g.home_score, g.away_score, g.completed
              FROM picks p JOIN games g ON g.id = p.game_id ORDER BY p.week, p.slot"""
     ).fetchall()
@@ -663,6 +663,7 @@ def analytics(conn=Depends(db)):
             rules.finish_tally(tally)
 
     return {
+        "on_the_clock": _time_on_the_clock(rows),
         "by_slot": [by_slot[s] for s in sorted(by_slot)],
         "by_half": [by_half["first"], by_half["second"]],
         "by_player_slot": {p: [by_player_slot[p][s] for s in sorted(by_player_slot[p])]
@@ -671,6 +672,71 @@ def analytics(conn=Depends(db)):
         "slots": rules.SLOTS_PER_WEEK,
         "weeks_drafted": len(weeks),
         "weeks_graded": len(graded_weeks),
+    }
+
+
+def _time_on_the_clock(rows) -> dict:
+    """How long each player sat on the clock before picking.
+
+    The clock starts when the previous pick in that week lands, so the first
+    pick of a week is excluded -- nothing put that player on the clock.
+
+    Slot 4 is skipped as well. The snake turns there, so whoever made slot 3
+    is immediately up again -- already on the page, picking seconds later. That
+    is not someone responding to their turn, and counting it would pull every
+    median toward zero.
+    """
+    by_week: dict[int, list[dict]] = {}
+    for row in rows:
+        pick = dict(row)
+        by_week.setdefault(pick["week"], []).append(pick)
+
+    handoffs: dict[str, list[float]] = {}
+    slowest: dict[str, dict | None] = {}
+
+    for week, picks in by_week.items():
+        picks.sort(key=lambda p: p["slot"])
+        for previous, current in zip(picks, picks[1:]):
+            # Only consecutive slots: a gap means a pick was removed.
+            if current["slot"] != previous["slot"] + 1:
+                continue
+            # The snake hands slot 4 back to the player who just took slot 3.
+            if current["player"] == previous["player"]:
+                continue
+            waited = rules.minutes_between(previous["created_at"], current["created_at"])
+            if waited is None:
+                continue
+            player = current["player"]
+            handoffs.setdefault(player, []).append(waited)
+            worst = slowest.get(player)
+            if worst is None or waited > worst["minutes"]:
+                slowest[player] = {
+                    "minutes": round(waited, 1),
+                    "display": rules.format_duration(waited),
+                    "week": week,
+                    "slot": current["slot"],
+                }
+
+    def summarise(player, waits):
+        mid = rules.median(waits)
+        return {
+            "player": player,
+            "picks": len(waits),
+            "median_minutes": None if mid is None else round(mid, 1),
+            "median": rules.format_duration(mid),
+            "fastest": rules.format_duration(min(waits)) if waits else "—",
+            "slowest": rules.format_duration(max(waits)) if waits else "—",
+            "slowest_detail": slowest.get(player),
+        }
+
+    everyone = [w for waits in handoffs.values() for w in waits]
+    return {
+        "players": [summarise(p, handoffs.get(p, [])) for p in rules.PLAYERS],
+        "league_median": rules.format_duration(rules.median(everyone)),
+        "league_median_minutes": (
+            None if not everyone else round(rules.median(everyone), 1)
+        ),
+        "handoffs_counted": len(everyone),
     }
 
 

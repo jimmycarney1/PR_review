@@ -180,6 +180,21 @@ which side of the baseline a bar sits on and by a signed label on every bar,
 never by colour alone: the green/red pair measures ΔE 1.3 under deuteranopia,
 which is indistinguishable to a red-green colourblind reader.
 
+### Time on the clock
+
+The same tab times how long each player sat on the clock before picking,
+measured from the previous pick in that week, with a median, fastest and
+slowest per player.
+
+Two picks are never counted. The **first pick of a week** has nothing before
+it, so nothing put that player on the clock. **Pick 4** is the snake turning:
+it goes straight back to whoever took pick 3, who is still on the page and
+picks seconds later -- not a response to a turn, and counting it would pull
+every median toward zero.
+
+It is a median rather than a mean because the distribution is long-tailed: one
+overnight wait would otherwise report a figure nobody actually picks at.
+
 ## Layout
 
 ```

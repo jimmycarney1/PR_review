@@ -764,6 +764,9 @@ async function renderAnalytics() {
     `The snake rotates, so everyone cycles through the same slot pairs — ` +
     `picks 1 and 6, 2 and 5, 3 and 4 — which makes these comparable.`));
 
+  box.append(el("h2", "section-title", "Time on the clock"));
+  box.append(clockTable(data.on_the_clock));
+
   box.append(el("h2", "section-title", "By draft position"));
   box.append(slotTable(data.by_slot));
   box.append(marginChart(data.by_slot));
@@ -773,6 +776,48 @@ async function renderAnalytics() {
   const scroller = el("div", "table-scroll");
   scroller.append(playerSlotTable(data));
   box.append(scroller);
+}
+
+// How long someone sat on the clock before picking. Median, because one
+// overnight wait would drag a mean somewhere nobody actually picks.
+function clockTable(clock) {
+  const wrap = el("div", "clock-panel");
+  if (!clock || !clock.handoffs_counted) {
+    wrap.append(el("p", "hint", "Not enough picks yet to time anyone."));
+    return wrap;
+  }
+
+  const table = el("table");
+  table.innerHTML =
+    "<thead><tr><th>Player</th><th class='num'>Picks</th>" +
+    "<th class='num'>Median</th><th class='num'>Fastest</th>" +
+    "<th class='num'>Slowest</th></tr></thead>";
+  const body = el("tbody");
+  clock.players.forEach((p) => {
+    const tr = el("tr");
+    const slow = el("td", "num");
+    slow.textContent = p.slowest;
+    if (p.slowest_detail) {
+      slow.title = `Week ${p.slowest_detail.week}, pick ${p.slowest_detail.slot}`;
+    }
+    tr.innerHTML =
+      `<td>${p.player}</td><td class="num">${p.picks}</td>` +
+      `<td class="num"><strong>${p.median}</strong></td>` +
+      `<td class="num">${p.fastest}</td>`;
+    tr.append(slow);
+    body.append(tr);
+  });
+  table.append(body);
+  // Five columns do not fit a phone; the table scrolls, the page does not.
+  const scroller = el("div", "table-scroll");
+  scroller.append(table);
+  wrap.append(scroller);
+  wrap.append(el("p", "chart-note",
+    `League median ${clock.league_median} across ${clock.handoffs_counted} handoffs. ` +
+    "Counted from the previous pick in that week, so the first pick of a week is " +
+    "excluded — nothing put that player on the clock. Pick 4 is excluded too: the " +
+    "snake hands it straight back to whoever took pick 3."));
+  return wrap;
 }
 
 function slotTable(slots) {
