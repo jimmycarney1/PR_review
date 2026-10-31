@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rage in the Cage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=Barlow+Semi+Condensed:wght@400;600;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one column "cage" — the scoreboard on top, this round's curses, then the penalty pool. Single dark look by choice. */
+:root {
+  --night: #110c15;
+  --pit: #1b1421;
+  --wire: #3a3044;
+  --bone: #efe6d6;
+  --ash: #a89ab3;
+  --pumpkin: #ff7a1a;
+  --ember: #c2410c;
+  --blood: #e0435a;
+  --display: "Creepster", "Impact", fantasy;
+  --body: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--night); }
+body {
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.4;
+  min-height: 100%;
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 26px, rgba(168,154,179,.07) 26px 28px),
+    repeating-linear-gradient(-45deg, transparent 0 26px, rgba(168,154,179,.07) 26px 28px),
+    radial-gradient(ellipse at 50% -10%, rgba(255,122,26,.22), transparent 60%);
+  background-attachment: fixed;
+}
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  display: grid;
+  gap: 28px;
+}
+header { text-align: center; display: grid; gap: 4px; }
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(3rem, 13vw, 5.6rem);
+  line-height: .9;
+  margin: 0;
+  color: var(--pumpkin);
+  text-shadow: 0 0 24px rgba(255,122,26,.45), 0 4px 0 var(--ember);
+  letter-spacing: .02em;
+  text-wrap: balance;
+}
+.tag { color: var(--ash); text-transform: uppercase; letter-spacing: .18em; font-size: .8rem; font-weight: 600; }
+h2 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 2rem;
+  margin: 0;
+  color: var(--bone);
+  letter-spacing: .03em;
+}
+section {
+  background: rgba(27,20,33,.92);
+  border: 2px solid var(--wire);
+  border-radius: 6px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sub { color: var(--ash); font-size: .9rem; }
+
+button, input { font: inherit; color: inherit; }
+button {
+  cursor: pointer;
+  border: 2px solid var(--wire);
+  background: var(--pit);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: .85rem;
+  transition: background .12s, border-color .12s, transform .08s;
+}
+button:hover { border-color: var(--ash); }
+button:active { transform: translateY(1px); }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--pumpkin); outline-offset: 2px; }
+.btn-hot { background: var(--pumpkin); border-color: var(--pumpkin); color: var(--night); }
+.btn-hot:hover { background: #ff9447; border-color: #ff9447; }
+.btn-ghost { background: transparent; color: var(--ash); }
+.btn-danger { border-color: var(--blood); color: var(--blood); background: transparent; }
+.btn-x { padding: 4px 9px; background: transparent; color: var(--ash); border-color: transparent; font-size: 1rem; }
+.btn-x:hover { color: var(--blood); border-color: var(--blood); }
+input[type="text"], input[type="number"] {
+  background: var(--night);
+  border: 2px solid var(--wire);
+  border-radius: 4px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+input::placeholder { color: #75687f; }
+input[type="number"] { font-family: var(--mono); width: 5.2em; text-align: center; }
+input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
+.add-row { display: flex; gap: 8px; }
+.add-row input { flex: 1; }
+
+/* Leaderboard */
+ol.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.row {
+  display: grid;
+  grid-template-columns: 2.2em minmax(0,1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--night);
+  border: 1px solid var(--wire);
+}
+.row.lead { border-color: var(--pumpkin); box-shadow: 0 0 0 1px var(--pumpkin) inset, 0 0 18px rgba(255,122,26,.18); }
+.row.flash { animation: flash .6s ease-out; }
+@keyframes flash { from { background: rgba(255,122,26,.35); } to { background: var(--night); } }
+.rank { font-family: var(--mono); color: var(--ash); font-size: .9rem; text-align: right; }
+.row.lead .rank { color: var(--pumpkin); }
+.name { font-weight: 800; font-size: 1.15rem; overflow-wrap: anywhere; }
+.pts { font-family: var(--mono); font-weight: 700; font-size: 1.35rem; font-variant-numeric: tabular-nums; min-width: 2.6em; text-align: right; }
+.pts.neg { color: var(--blood); }
+.ctrls { display: flex; gap: 6px; align-items: center; }
+.ctrls .add { padding: 8px 10px; }
+.confirm { display: flex; gap: 6px; align-items: center; color: var(--blood); font-size: .85rem; font-weight: 600; }
+.foot { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+
+/* Curses */
+.round-no { font-family: var(--mono); color: var(--pumpkin); font-size: .95rem; }
+.curses { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.curse {
+  border: 2px dashed var(--wire);
+  border-radius: 6px;
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  background: var(--night);
+  min-height: 132px;
+}
+.curse.dealt { border-style: solid; border-color: var(--ember); animation: deal .45s cubic-bezier(.2,1.6,.4,1) both; }
+.curse:nth-child(2).dealt { animation-delay: .08s; }
+.curse:nth-child(3).dealt { animation-delay: .16s; }
+.curse:nth-child(4).dealt { animation-delay: .24s; }
+@keyframes deal { from { transform: scale(.85) rotate(-3deg); opacity: .4; } to { transform: none; opacity: 1; } }
+.curse-top { display: flex; align-items: center; gap: 8px; }
+.glyph { font-size: 1.7rem; line-height: 1; }
+.curse-name { text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: .85rem; color: var(--ash); }
+.curse-text { font-size: 1.1rem; font-weight: 600; text-wrap: pretty; }
+.curse-text.empty { color: #75687f; font-weight: 400; font-style: italic; }
+.reroll { justify-self: start; padding: 3px 8px; font-size: .72rem; color: var(--ash); background: transparent; }
+.big-btn { width: 100%; padding: 14px; font-size: 1.05rem; }
+
+/* Penalty pool */
+ol.pool { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; counter-reset: p; }
+ol.pool li {
+  counter-increment: p;
+  display: grid;
+  grid-template-columns: 2em minmax(0,1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--wire);
+}
+ol.pool li::before { content: counter(p) "."; font-family: var(--mono); color: var(--pumpkin); text-align: right; font-size: .9rem; }
+ol.pool li span { overflow-wrap: anywhere; }
+
+.empty-note { color: var(--ash); font-style: italic; margin: 0; }
+
+@media (max-width: 480px) {
+  .row { grid-template-columns: 1.8em minmax(0,1fr) auto; row-gap: 8px; }
+  .ctrls { grid-column: 1 / -1; justify-content: flex-end; }
+  .curses { grid-template-columns: minmax(0,1fr); }
+  .curse { min-height: 0; }
+  h2 { font-size: 1.7rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Rage in the Cage</h1>
+    <div class="tag">Halloween · Cups · Carnage</div>
+  </header>
+
+  <section aria-labelledby="board-h">
+    <div class="sec-head">
+      <h2 id="board-h">Leaderboard</h2>
+      <span class="sub">Type points, hit Add. Negatives work too.</span>
+    </div>
+    <ol class="board" id="board"></ol>
+    <form class="add-row" id="add-player">
+      <input type="text" id="new-player" placeholder="Add a new victim…" autocomplete="off" maxlength="40">
+      <button type="submit" class="btn-hot">Add player</button>
+    </form>
+    <div class="foot">
+      <span class="sub" id="player-count"></span>
+      <span id="reset-zone"><button type="button" class="btn-ghost" id="reset-btn">Reset all points</button></span>
+    </div>
+  </section>
+
+  <section aria-labelledby="round-h">
+    <div class="sec-head">
+      <h2 id="round-h">This round's curses</h2>
+      <span class="round-no" id="round-no"></span>
+    </div>
+    <div class="curses" id="curses"></div>
+    <button type="button" class="btn-hot big-btn" id="end-round">End round · deal penalties</button>
+  </section>
+
+  <section aria-labelledby="pool-h">
+    <div class="sec-head">
+      <h2 id="pool-h">Penalty pool</h2>
+      <span class="sub" id="pool-count"></span>
+    </div>
+    <ol class="pool" id="pool"></ol>
+    <form class="add-row" id="add-penalty">
+      <input type="text" id="new-penalty" placeholder="Add a new penalty…" autocomplete="off" maxlength="160">
+      <button type="submit" class="btn-hot">Add</button>
+    </form>
+  </section>
+</div>
+
+<script>
+(function () {
+  var KEY = "rage-in-the-cage-v1";
+  var SYMBOLS = [
+    { id: "cat", name: "Cat", glyph: "🐈‍⬛" },
+    { id: "ghost", name: "Ghost", glyph: "👻" },
+    { id: "pumpkin", name: "Pumpkin", glyph: "🎃" },
+    { id: "skeleton", name: "Skeleton", glyph: "💀" }
+  ];
+  var DEFAULT_PLAYERS = ["Dani","Nunsy","Hales","Ben","Arjun","Arthi","Arnav","Rachel","Phi","Jimmy","MairBall","Katrina"];
+  var DEFAULT_PENALTIES = [
+    "Call Phi's mom",
+    "Play next round off-handed",
+    "Play next round with sunglasses",
+    "360 turn after each round",
+    "Impromptu karaoke",
+    "Tell us whether or not you've ever sent a nude",
+    "Say something nice about Phi",
+    "Play to the right of Ananya next turn"
+  ];
+
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+  function fresh() {
+    return {
+      players: DEFAULT_PLAYERS.map(function (n) { return { id: uid(), name: n, points: 0 }; }),
+      penalties: DEFAULT_PENALTIES.slice(),
+      round: 1,
+      curses: {}
+    };
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && Array.isArray(s.players) && Array.isArray(s.penalties)) {
+          s.round = s.round || 1; s.curses = s.curses || {};
+          return s;
+        }
+      }
+    } catch (e) {}
+    return fresh();
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var state = load();
+  var confirmingRemove = null;
+  var confirmingReset = false;
+  var flashId = null;
+  var justDealt = false;
+
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      if (k === "text") n.textContent = attrs[k];
+      else if (k === "class") n.className = attrs[k];
+      else if (k.slice(0, 2) === "on") n.addEventListener(k.slice(2), attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+    return n;
+  }
+
+  function sorted() {
+    return state.players.slice().sort(function (a, b) {
+      return b.points - a.points || a.name.localeCompare(b.name);
+    });
+  }
+
+  function renderBoard() {
+    var board = document.getElementById("board");
+    board.innerHTML = "";
+    var list = sorted();
+    var top = list.length && list[0].points > 0 ? list[0].points : null;
+    var rank = 0, prev = null;
+    list.forEach(function (p, i) {
+      if (p.points !== prev) { rank = i + 1; prev = p.points; }
+      var row = el("li", { class: "row" + (top !== null && p.points === top ? " lead" : "") + (p.id === flashId ? " flash" : "") });
+      row.appendChild(el("span", { class: "rank", text: "#" + rank }));
+      row.appendChild(el("span", { class: "name", text: p.name }));
+      row.appendChild(el("span", { class: "pts" + (p.points < 0 ? " neg" : ""), text: String(p.points) }));
+
+      var ctrls;
+      if (confirmingRemove === p.id) {
+        ctrls = el("span", { class: "confirm" }, [
+          el("span", { text: "Remove?" }),
+          el("button", { type: "button", class: "btn-danger", text: "Yes", onclick: function () {
+            state.players = state.players.filter(function (x) { return x.id !== p.id; });
+            confirmingRemove = null; save(); render();
+          } }),
+          el("button", { type: "button", class: "btn-ghost", text: "No", onclick: function () { confirmingRemove = null; renderBoard(); } })
+        ]);
+      } else {
+        var inputId = "pts-" + p.id;
+        var input = el("input", { type: "number", id: inputId, step: "1", inputmode: "numeric", placeholder: "+1", "aria-label": "Points for " + p.name });
+        function addPts() {
+          var v = input.value.trim() === "" ? 1 : parseInt(input.value, 10);
+          if (isNaN(v)) return;
+          p.points += v;
+          flashId = p.id;
+          save(); renderBoard();
+          flashId = null;
+        }
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addPts(); } });
+        ctrls = el("span", { class: "ctrls" }, [
+          input,
+          el("button", { type: "button", class: "btn-hot add", text: "Add", onclick: addPts }),
+          el("button", { type: "button", class: "btn-x", title: "Remove " + p.name, "aria-label": "Remove " + p.name, text: "✕", onclick: function () { confirmingRemove = p.id; renderBoard(); } })
+        ]);
+      }
+      row.appendChild(ctrls);
+      board.appendChild(row);
+    });
+    if (!list.length) board.appendChild(el("li", { class: "empty-note", text: "The cage is empty. Add someone below." }));
+    document.getElementById("player-count").textContent = list.length + (list.length === 1 ? " player" : " players");
+    renderReset();
+  }
+
+  function renderReset() {
+    var z = document.getElementById("reset-zone");
+    z.innerHTML = "";
+    if (confirmingReset) {
+      z.appendChild(el("span", { class: "confirm" }, [
+        el("span", { text: "Zero everyone?" }),
+        el("button", { type: "button", class: "btn-danger", text: "Reset", onclick: function () {
+          state.players.forEach(function (p) { p.points = 0; });
+          state.round = 1; state.curses = {};
+          confirmingReset = false; save(); render();
+        } }),
+        el("button", { type: "button", class: "btn-ghost", text: "Cancel", onclick: function () { confirmingReset = false; renderReset(); } })
+      ]));
+    } else {
+      z.appendChild(el("button", { type: "button", class: "btn-ghost", text: "Reset all points", onclick: function () { confirmingReset = true; renderReset(); } }));
+    }
+  }
+
+  function pick(exclude) {
+    var pool = state.penalties.filter(function (t) { return exclude.indexOf(t) === -1; });
+    if (!pool.length) pool = state.penalties;
+    if (!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function dealAll() {
+    var used = [];
+    state.curses = {};
+    SYMBOLS.forEach(function (s) {
+      var t = pick(used);
+      state.curses[s.id] = t;
+      if (t) used.push(t);
+    });
+  }
+  function rerollOne(id) {
+    var others = SYMBOLS.filter(function (s) { return s.id !== id; }).map(function (s) { return state.curses[s.id]; });
+    others.push(state.curses[id]);
+    state.curses[id] = pick(others);
+  }
+
+  function renderCurses() {
+    var wrap = document.getElementById("curses");
+    wrap.innerHTML = "";
+    var any = SYMBOLS.some(function (s) { return state.curses[s.id]; });
+    SYMBOLS.forEach(function (s) {
+      var t = state.curses[s.id];
+      wrap.appendChild(el("div", { class: "curse" + (t && justDealt ? " dealt" : "") + (t ? "" : "") }, [
+        el("div", { class: "curse-top" }, [
+          el("span", { class: "glyph", "aria-hidden": "true", text: s.glyph }),
+          el("span", { class: "curse-name", text: s.name })
+        ]),
+        el("div", { class: "curse-text" + (t ? "" : " empty"), text: t || (state.penalties.length ? "Waiting for the round to end…" : "Penalty pool is empty.") }),
+        t ? el("button", { type: "button", class: "reroll", text: "Re-roll", onclick: function () { rerollOne(s.id); save(); justDealt = false; renderCurses(); } }) : null
+      ]));
+    });
+    justDealt = false;
+    document.getElementById("round-no").textContent = any ? "Round " + (state.round - 1) + " penalties" : "Round " + state.round + " in progress";
+  }
+
+  function renderPool() {
+    var pool = document.getElementById("pool");
+    pool.innerHTML = "";
+    state.penalties.forEach(function (t, i) {
+      pool.appendChild(el("li", null, [
+        el("span", { text: t }),
+        el("button", { type: "button", class: "btn-x", title: "Remove penalty", "aria-label": "Remove penalty: " + t, text: "✕", onclick: function () {
+          state.penalties.splice(i, 1);
+          SYMBOLS.forEach(function (s) { if (state.curses[s.id] === t) state.curses[s.id] = null; });
+          save(); renderPool(); renderCurses();
+        } })
+      ]));
+    });
+    if (!state.penalties.length) pool.appendChild(el("li", { class: "empty-note", text: "No penalties yet. Add one below." }));
+    var n = state.penalties.length;
+    document.getElementById("pool-count").textContent = n + (n === 1 ? " penalty" : " penalties");
+  }
+
+  function render() { renderBoard(); renderCurses(); renderPool(); }
+
+  document.getElementById("add-player").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var inp = document.getElementById("new-player");
+    var name = inp.value.trim();
+    if (!name) return;
+    var p = { id: uid(), name: name, points: 0 };
+    state.players.push(p);
+    flashId = p.id;
+    inp.value = "";
+    save(); renderBoard(); flashId = null;
+  });
+
+  document.getElementById("add-penalty").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var inp = document.getElementById("new-penalty");
+    var t = inp.value.trim();
+    if (!t) return;
+    state.penalties.push(t);
+    inp.value = "";
+    save(); renderPool(); renderCurses();
+  });
+
+  document.getElementById("end-round").addEventListener("click", function () {
+    dealAll();
+    state.round += 1;
+    justDealt = true;
+    save(); renderCurses();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
