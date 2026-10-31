@@ -18,6 +18,7 @@
   --pumpkin: #ff7a1a;
   --ember: #c2410c;
   --blood: #e0435a;
+  --spirit: #8fd3c7;
   --display: "Creepster", "Impact", fantasy;
   --body: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
@@ -161,6 +162,9 @@ ol.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .curse-name { text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: .85rem; color: var(--ash); }
 .curse-text { font-size: 1.1rem; font-weight: 600; text-wrap: pretty; }
 .curse-text.empty { color: #75687f; font-weight: 400; font-style: italic; }
+.curse.safe { border-style: solid; border-color: var(--spirit); background: rgba(143,211,199,.08); }
+.curse.safe .curse-text { color: var(--spirit); font-family: var(--display); font-weight: 400; font-size: 1.6rem; letter-spacing: .03em; }
+.safe-note { color: var(--ash); font-size: .85rem; }
 .reroll { justify-self: start; padding: 3px 8px; font-size: .72rem; color: var(--ash); background: transparent; }
 .big-btn { width: 100%; padding: 14px; font-size: 1.05rem; }
 
@@ -403,10 +407,13 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
     if (!pool.length) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   }
+  var SAFE = "__safe__";
   function dealAll() {
     var used = [];
     state.curses = {};
-    SYMBOLS.forEach(function (s) {
+    var safeIdx = Math.floor(Math.random() * SYMBOLS.length);
+    SYMBOLS.forEach(function (s, idx) {
+      if (idx === safeIdx) { state.curses[s.id] = SAFE; return; }
       var t = pick(used);
       state.curses[s.id] = t;
       if (t) used.push(t);
@@ -424,13 +431,14 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
     var any = SYMBOLS.some(function (s) { return state.curses[s.id]; });
     SYMBOLS.forEach(function (s) {
       var t = state.curses[s.id];
-      wrap.appendChild(el("div", { class: "curse" + (t && justDealt ? " dealt" : "") + (t ? "" : "") }, [
+      var safe = t === SAFE;
+      wrap.appendChild(el("div", { class: "curse" + (t && justDealt ? " dealt" : "") + (safe ? " safe" : "") }, [
         el("div", { class: "curse-top" }, [
           el("span", { class: "glyph", "aria-hidden": "true", text: s.glyph }),
           el("span", { class: "curse-name", text: s.name })
         ]),
-        el("div", { class: "curse-text" + (t ? "" : " empty"), text: t || (state.penalties.length ? "Waiting for the round to end…" : "Penalty pool is empty.") }),
-        t ? el("button", { type: "button", class: "reroll", text: "Re-roll", onclick: function () { rerollOne(s.id); save(); justDealt = false; renderCurses(); } }) : null
+        el("div", { class: "curse-text" + (t ? "" : " empty"), text: safe ? "No penalty" : t || (state.penalties.length ? "Waiting for the round to end…" : "Penalty pool is empty.") }),
+        safe ? el("span", { class: "safe-note", text: "You're spared this round." }) : t ? el("button", { type: "button", class: "reroll", text: "Re-roll", onclick: function () { rerollOne(s.id); save(); justDealt = false; renderCurses(); } }) : null
       ]));
     });
     justDealt = false;
