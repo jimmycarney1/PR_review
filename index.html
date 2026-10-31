@@ -176,7 +176,12 @@ ol.pool li {
   border-bottom: 1px solid var(--wire);
 }
 ol.pool li::before { content: counter(p) "."; font-family: var(--mono); color: var(--pumpkin); text-align: right; font-size: .9rem; }
-ol.pool li span { overflow-wrap: anywhere; }
+ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
+.pool-actions { display: flex; gap: 2px; align-items: center; }
+.btn-edit { padding: 4px 8px; background: transparent; color: var(--ash); border-color: transparent; font-size: .72rem; }
+.btn-edit:hover { color: var(--pumpkin); border-color: var(--pumpkin); }
+.edit-form { display: flex; gap: 6px; min-width: 0; grid-column: 2 / -1; flex-wrap: wrap; }
+.edit-form input { flex: 1 1 12em; }
 
 .empty-note { color: var(--ash); font-style: italic; margin: 0; }
 
@@ -288,6 +293,7 @@ ol.pool li span { overflow-wrap: anywhere; }
   var confirmingReset = false;
   var flashId = null;
   var justDealt = false;
+  var editingPenalty = null;
 
   function el(tag, attrs, kids) {
     var n = document.createElement(tag);
@@ -418,13 +424,40 @@ ol.pool li span { overflow-wrap: anywhere; }
     var pool = document.getElementById("pool");
     pool.innerHTML = "";
     state.penalties.forEach(function (t, i) {
-      pool.appendChild(el("li", null, [
-        el("span", { text: t }),
-        el("button", { type: "button", class: "btn-x", title: "Remove penalty", "aria-label": "Remove penalty: " + t, text: "✕", onclick: function () {
-          state.penalties.splice(i, 1);
-          SYMBOLS.forEach(function (s) { if (state.curses[s.id] === t) state.curses[s.id] = null; });
+      if (editingPenalty === i) {
+        var inp = el("input", { type: "text", id: "edit-penalty", maxlength: "160", "aria-label": "Edit penalty " + (i + 1) });
+        inp.value = t;
+        var form = el("form", { class: "edit-form" }, [
+          inp,
+          el("button", { type: "submit", class: "btn-hot", text: "Save" }),
+          el("button", { type: "button", class: "btn-ghost", text: "Cancel", onclick: function () { editingPenalty = null; renderPool(); } })
+        ]);
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var v = inp.value.trim();
+          if (!v) return;
+          state.penalties[i] = v;
+          SYMBOLS.forEach(function (s) { if (state.curses[s.id] === t) state.curses[s.id] = v; });
+          editingPenalty = null;
           save(); renderPool(); renderCurses();
-        } })
+        });
+        inp.addEventListener("keydown", function (e) { if (e.key === "Escape") { editingPenalty = null; renderPool(); } });
+        pool.appendChild(el("li", null, [form]));
+        setTimeout(function () { inp.focus(); inp.select(); }, 0);
+        return;
+      }
+      function startEdit() { editingPenalty = i; renderPool(); }
+      pool.appendChild(el("li", null, [
+        el("span", { class: "p-text", text: t, title: "Click to edit", onclick: startEdit }),
+        el("span", { class: "pool-actions" }, [
+          el("button", { type: "button", class: "btn-edit", "aria-label": "Edit penalty: " + t, text: "Edit", onclick: startEdit }),
+          el("button", { type: "button", class: "btn-x", title: "Remove penalty", "aria-label": "Remove penalty: " + t, text: "✕", onclick: function () {
+            state.penalties.splice(i, 1);
+            SYMBOLS.forEach(function (s) { if (state.curses[s.id] === t) state.curses[s.id] = null; });
+            editingPenalty = null;
+            save(); renderPool(); renderCurses();
+          } })
+        ])
       ]));
     });
     if (!state.penalties.length) pool.appendChild(el("li", { class: "empty-note", text: "No penalties yet. Add one below." }));
