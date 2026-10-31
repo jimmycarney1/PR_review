@@ -196,6 +196,39 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
   .curse { min-height: 0; }
   h2 { font-size: 1.7rem; }
 }
+/* Big screen (laptop on a TV): leaderboard left, curses + pool right, type scales with the screen */
+@media (min-width: 1100px) and (min-aspect-ratio: 4/3) {
+  html { font-size: clamp(16px, 1.05vw, 34px); }
+  body { font-size: 1.1rem; }
+  .wrap {
+    max-width: 96vw;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    align-items: start;
+    gap: 1.4rem 1.8rem;
+    padding-block: 1.4rem 2rem;
+  }
+  header { grid-column: 1 / -1; }
+  h1 { font-size: 3.6rem; }
+  h2 { font-size: 2rem; }
+  section { padding: 1rem; gap: .7rem; }
+  section[aria-labelledby="board-h"] { grid-column: 1; grid-row: 2 / span 2; }
+  section[aria-labelledby="round-h"] { grid-column: 2; grid-row: 2; }
+  section[aria-labelledby="pool-h"] { grid-column: 2; grid-row: 3; }
+  ol.board { gap: .25rem; }
+  .row { padding: .15rem .6rem; }
+  .ctrls input[type="number"], .ctrls .add { padding-block: .3rem; }
+  .name { font-size: 1.45rem; }
+  .pts { font-size: 1.7rem; }
+  .rank { font-size: 1.05rem; }
+  .curse { min-height: 8.5rem; padding: 1rem; }
+  .glyph { font-size: 2.4rem; }
+  .curse-name { font-size: 1rem; }
+  .curse-text { font-size: 1.4rem; }
+  .curse.safe .curse-text { font-size: 2.1rem; }
+  ol.pool { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.2rem; }
+  ol.pool li { padding: .25rem .2rem; font-size: .95rem; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
