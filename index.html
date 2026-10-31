@@ -260,9 +260,25 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
     "360 turn after each round",
     "Impromptu karaoke",
     "Tell us whether or not you've ever sent a nude",
-    "Say something nice about Phi",
-    "Play to the right of Ananya next turn"
+    "Kiss Phi's ring",
+    "Play to the right of Ananya next turn",
+    "Play next round on one leg",
+    "Call Phi “my lady” the rest of the night",
+    "Drink half of the bitch up or half a shot",
+    "15 seconds of freestyle rap to a beat"
   ];
+  var DEFAULTS_VERSION = 2;
+  function migrate(s) {
+    if ((s.defaultsVersion || 1) < 2) {
+      var i = s.penalties.indexOf("Say something nice about Phi");
+      if (i !== -1) s.penalties[i] = "Kiss Phi's ring";
+      DEFAULT_PENALTIES.slice(8).forEach(function (t) {
+        if (s.penalties.indexOf(t) === -1) s.penalties.push(t);
+      });
+    }
+    s.defaultsVersion = DEFAULTS_VERSION;
+    return s;
+  }
 
   function uid() { return Math.random().toString(36).slice(2, 10); }
   function fresh() {
@@ -270,7 +286,8 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
       players: DEFAULT_PLAYERS.map(function (n) { return { id: uid(), name: n, points: 0 }; }),
       penalties: DEFAULT_PENALTIES.slice(),
       round: 1,
-      curses: {}
+      curses: {},
+      defaultsVersion: DEFAULTS_VERSION
     };
   }
   function load() {
@@ -280,7 +297,7 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
         var s = JSON.parse(raw);
         if (s && Array.isArray(s.players) && Array.isArray(s.penalties)) {
           s.round = s.round || 1; s.curses = s.curses || {};
-          return s;
+          return migrate(s);
         }
       }
     } catch (e) {}
