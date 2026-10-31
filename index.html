@@ -229,6 +229,49 @@ ol.pool li .p-text { overflow-wrap: anywhere; cursor: text; }
   ol.pool { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.2rem; }
   ol.pool li { padding: .25rem .2rem; font-size: .95rem; }
 }
+/* Sideways phone (AirPlay to a TV): one screen, leaderboard left, curses + pool right; each column scrolls on its own */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  html { font-size: 13px; }
+  body { font-size: 13px; background-attachment: scroll; }
+  .wrap {
+    max-width: none;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 6px 10px;
+    padding-block: 6px;
+  }
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: center; gap: 12px; }
+  h1 { font-size: 1.9rem; text-shadow: 0 0 12px rgba(255,122,26,.45), 0 2px 0 var(--ember); }
+  .tag { font-size: .7rem; }
+  h2 { font-size: 1.25rem; }
+  section { padding: 6px 8px; gap: 6px; min-height: 0; border-width: 1px; }
+  .sec-head .sub { display: none; }
+  section[aria-labelledby="board-h"] { grid-column: 1; grid-row: 2 / span 2; overflow-y: auto; align-content: start; }
+  section[aria-labelledby="round-h"] { grid-column: 2; grid-row: 2; }
+  section[aria-labelledby="pool-h"] { grid-column: 2; grid-row: 3; overflow-y: auto; align-content: start; }
+  ol.board { gap: 3px; }
+  .row { padding: 1px 6px; gap: 6px; grid-template-columns: 2em minmax(0,1fr) auto auto; }
+  .name { font-size: 1.05rem; }
+  .pts { font-size: 1.15rem; min-width: 2em; }
+  .rank { font-size: .8rem; }
+  .ctrls { gap: 4px; }
+  .ctrls input[type="number"] { padding: 2px 4px; width: 3.8em; }
+  .ctrls .add { padding: 3px 8px; font-size: .75rem; }
+  .btn-x { padding: 2px 6px; }
+  button { padding: 4px 10px; font-size: .75rem; }
+  input[type="text"] { padding: 4px 8px; }
+  .curses { gap: 6px; }
+  .curse { min-height: 0; padding: 6px 8px; gap: 2px; border-width: 1px; }
+  .glyph { font-size: 1.15rem; }
+  .curse-name { font-size: .7rem; }
+  .curse-text { font-size: .95rem; line-height: 1.2; }
+  .curse.safe .curse-text { font-size: 1.35rem; }
+  .safe-note { font-size: .75rem; }
+  .reroll { padding: 1px 6px; font-size: .62rem; }
+  .big-btn { padding: 7px; font-size: .85rem; }
+  ol.pool li { padding: 2px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
