@@ -770,6 +770,9 @@ async function renderAnalytics() {
   box.append(el("h2", "section-title", "By draft position"));
   box.append(slotTable(data.by_slot));
   box.append(marginChart(data.by_slot));
+  box.append(el("h2", "section-title", "Favorites vs underdogs"));
+  box.append(sideTable(data));
+
   box.append(el("h2", "section-title", "Opening three vs the snake back"));
   box.append(halfTable(data.by_half));
   box.append(el("h2", "section-title", "Each player by position"));
@@ -838,6 +841,48 @@ function slotTable(slots) {
   });
   table.append(body);
   return table;
+}
+
+const SIDE_LABEL = { favorite: "Favorite", underdog: "Underdog", pickem: "Pick'em" };
+
+// Each player's record laying points against taking them, with the league row
+// underneath for context. Share says how often they lean that way at all.
+function sideTable(data) {
+  const wrap = el("div", "table-scroll");
+  const table = el("table");
+  table.innerHTML =
+    "<thead><tr><th>Player</th><th>Side</th><th class='num'>Picks</th>" +
+    "<th class='num' title='Share of this player&apos;s picks'>Share</th>" +
+    "<th>Record</th><th class='num'>Win %</th>" +
+    "<th class='num'>Diff</th><th class='num'>Avg</th></tr></thead>";
+  const body = el("tbody");
+
+  const row = (label, cell, isLeague) => {
+    const tr = el("tr");
+    if (isLeague) tr.className = "league-row";
+    tr.innerHTML =
+      `<td>${label}</td><td>${SIDE_LABEL[cell.side]}</td>` +
+      `<td class="num">${cell.picks}</td>` +
+      `<td class="num">${cell.share == null ? "—" : Math.round(cell.share * 100) + "%"}</td>` +
+      `<td>${cell.graded ? cell.record : "—"}</td>` +
+      `<td class="num">${cell.win_pct == null ? "—" : cell.win_pct.toFixed(3)}</td>` +
+      `<td class="num diff ${marginTone(cell.margin)}">${cell.graded ? cell.margin_display : "—"}</td>` +
+      `<td class="num diff ${marginTone(cell.avg_margin ?? 0)}">${cell.avg_margin_display}</td>`;
+    return tr;
+  };
+
+  data.players.forEach((player) => {
+    (data.by_player_side[player] || [])
+      .filter((cell) => cell.picks > 0)          // skip a side nobody has taken
+      .forEach((cell, i) => body.append(row(i ? "" : player, cell, false)));
+  });
+  data.by_side
+    .filter((cell) => cell.picks > 0)
+    .forEach((cell, i) => body.append(row(i ? "" : "League", { ...cell, share: null }, true)));
+
+  table.append(body);
+  wrap.append(table);
+  return wrap;
 }
 
 function halfTable(halves) {

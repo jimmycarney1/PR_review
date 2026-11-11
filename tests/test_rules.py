@@ -300,3 +300,26 @@ def test_median_handles_an_even_count_and_an_empty_one():
 def test_time_running_backwards_is_rejected():
     assert rules.minutes_between("2026-10-27T15:00:00Z", "2026-10-27T16:00:00Z") == 60
     assert rules.minutes_between("2026-10-27T16:00:00Z", "2026-10-27T15:00:00Z") is None
+
+
+def test_a_pick_leans_by_the_sign_of_its_spread():
+    assert rules.pick_side(-3.5) == "favorite"     # laying points
+    assert rules.pick_side(-0.5) == "favorite"
+    assert rules.pick_side(7) == "underdog"        # taking them
+    assert rules.pick_side(0.5) == "underdog"
+    assert rules.pick_side(0) == "pickem"          # neither
+
+
+def test_the_two_sides_of_a_game_lean_opposite_ways():
+    for spread in (-3, -7.5, -1.5):
+        assert rules.pick_side(spread) == "favorite"
+        assert rules.pick_side(-spread) == "underdog"
+
+
+def test_a_tally_counts_graded_and_pending_picks():
+    tally = rules.new_tally()
+    for result, margin in [("WIN", 3), ("LOSS", -2), ("PUSH", 0), (None, None)]:
+        rules.add_to_tally(tally, result, margin)
+    rules.finish_tally(tally)
+    assert tally["graded"] == 3
+    assert tally["picks"] == 4

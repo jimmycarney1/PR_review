@@ -180,6 +180,14 @@ which side of the baseline a bar sits on and by a signed label on every bar,
 never by colour alone: the green/red pair measures ΔE 1.3 under deuteranopia,
 which is indistinguishable to a red-green colourblind reader.
 
+### Favorites vs underdogs
+
+Each player's record laying points against taking them, with the share of
+their picks that went each way and the league totals underneath to read them
+against. A pick's side is the sign of its spread: negative lays points,
+positive takes them, and a line of exactly zero is a pick'em, counted as
+neither rather than folded into one.
+
 ### Time on the clock
 
 The same tab times how long each player sat on the clock before picking,

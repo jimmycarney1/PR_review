@@ -245,6 +245,9 @@ th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color:
 td.num { font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: var(--panel); }
 .leader td { color: var(--gold); font-weight: 600; }
+/* The league totals sit under the players as a baseline to read them against. */
+.league-row td { color: var(--ink-dim); }
+.league-row:first-of-type td { border-top: 1px solid var(--line); }
 
 .ledger-entry {
   display: grid; grid-template-columns: 116px 1fr; gap: 12px;

@@ -917,3 +917,102 @@ def test_timing_is_absent_until_there_is_a_handoff(client, stub_odds):
     pick(client, "Jimmy", "Chicago Bears", ids[("Chicago Bears", "Green Bay Packers")])
     # One pick is nobody's handoff.
     assert client.get("/api/analytics").json()["on_the_clock"]["handoffs_counted"] == 0
+
+
+def _side_week(client, week, finals):
+    """Six picks: slots 1-3 lay -3, slots 4-6 take +3, each in its own game."""
+    games = [
+        client.post("/api/games/manual",
+                    json={"week": week, "home_team": home, "away_team": away}).json()["game_id"]
+        for home, away in SLOT_GAMES
+    ]
+    order = client.get("/api/board", params={"week": week}).json()["draft_order"]
+    for slot, player in enumerate(order, start=1):
+        home, away = SLOT_GAMES[slot - 1]
+        # Early slots take the home favourite; later slots take the road dog.
+        team, spread = (home, -3) if slot <= 3 else (away, 3)
+        r = pick(client, player, team, games[slot - 1], week=week,
+                 override_spread=spread, override_reason="test slate")
+        assert r.status_code == 200, r.text
+    for slot, home_margin in finals.items():
+        client.post("/api/scores/manual", json={
+            "game_id": games[slot - 1],
+            "home_score": 20 + home_margin, "away_score": 20})
+    return games
+
+
+def test_picks_are_split_into_favourites_and_underdogs(client, stub_odds):
+    # Home wins every game by 7: the -3 favourites cover (+4), the +3 dogs do not (-4).
+    _side_week(client, 1, {s: 7 for s in range(1, 7)})
+    by_side = {s["side"]: s for s in client.get("/api/analytics").json()["by_side"]}
+
+    assert by_side["favorite"]["record"] == "3-0"
+    assert by_side["favorite"]["margin"] == 12          # +4 each
+    assert by_side["underdog"]["record"] == "0-3"
+    assert by_side["underdog"]["margin"] == -12
+    assert by_side["pickem"]["picks"] == 0
+
+
+def test_a_pickem_is_neither_side(client, stub_odds):
+    gid = client.post("/api/games/manual",
+                      json={"week": 1, "home_team": "Green Bay Packers",
+                            "away_team": "Chicago Bears"}).json()["game_id"]
+    pick(client, "Jimmy", "Green Bay Packers", gid, week=1,
+         override_spread=0, override_reason="pick'em")
+    client.post("/api/scores/manual",
+                json={"game_id": gid, "home_score": 24, "away_score": 20})
+
+    by_side = {s["side"]: s for s in client.get("/api/analytics").json()["by_side"]}
+    assert by_side["pickem"]["record"] == "1-0"
+    assert by_side["favorite"]["picks"] == 0
+    assert by_side["underdog"]["picks"] == 0
+
+
+def test_each_player_gets_their_own_split(client, stub_odds):
+    _side_week(client, 1, {s: 7 for s in range(1, 7)})
+    grid = client.get("/api/analytics").json()["by_player_side"]
+
+    # Week 1 runs Jimmy, Mack, Anthony | Anthony, Mack, Jimmy, so each player
+    # laid points once and took them once.
+    for player in ("Jimmy", "Mack", "Anthony"):
+        sides = {c["side"]: c for c in grid[player]}
+        assert sides["favorite"]["record"] == "1-0"
+        assert sides["favorite"]["margin"] == 4
+        assert sides["underdog"]["record"] == "0-1"
+        assert sides["underdog"]["margin"] == -4
+
+
+def test_share_says_how_often_a_player_leans_each_way(client, stub_odds):
+    _side_week(client, 1, {s: 7 for s in range(1, 7)})
+    grid = client.get("/api/analytics").json()["by_player_side"]
+    for player in ("Jimmy", "Mack", "Anthony"):
+        sides = {c["side"]: c for c in grid[player]}
+        assert sides["favorite"]["share"] == 0.5
+        assert sides["underdog"]["share"] == 0.5
+        assert sum(c["share"] for c in grid[player]) == 1.0
+
+
+def test_the_sides_account_for_every_pick(client, stub_odds):
+    _side_week(client, 1, {s: 7 for s in range(1, 7)})
+    body = client.get("/api/analytics").json()
+    by_side = {s["side"]: s for s in body["by_side"]}
+    by_slot = {s["slot"]: s for s in body["by_slot"]}
+    assert sum(s["picks"] for s in by_side.values()) == sum(s["picks"] for s in by_slot.values()) == 6
+    # And the per-player split sums back to the league split.
+    for side in ("favorite", "underdog", "pickem"):
+        per_player = sum(
+            next(c for c in body["by_player_side"][p] if c["side"] == side)["graded"]
+            for p in body["by_player_side"]
+        )
+        assert per_player == by_side[side]["graded"]
+
+
+def test_an_ungraded_pick_counts_toward_share_but_not_record(client, stub_odds):
+    _side_week(client, 1, {1: 7})                 # only slot 1 has a final
+    grid = client.get("/api/analytics").json()["by_player_side"]
+    jimmy = {c["side"]: c for c in grid["Jimmy"]}   # Jimmy has slots 1 and 6
+    assert jimmy["favorite"]["picks"] == 1 and jimmy["favorite"]["graded"] == 1
+    assert jimmy["underdog"]["picks"] == 1 and jimmy["underdog"]["graded"] == 0
+    assert jimmy["underdog"]["record"] == "0-0"
+    assert jimmy["underdog"]["avg_margin"] is None
+    assert jimmy["favorite"]["share"] == 0.5

@@ -638,6 +638,12 @@ def analytics(conn=Depends(db)):
     }
     # Picks 1-3 open the round; 4-6 are the snake coming back.
     by_half = {"first": rules.new_tally(half="first"), "second": rules.new_tally(half="second")}
+    # Laying points against taking them.
+    by_side = {side: rules.new_tally(side=side) for side in rules.SIDES}
+    by_player_side = {
+        player: {side: rules.new_tally(player=player, side=side) for side in rules.SIDES}
+        for player in rules.PLAYERS
+    }
     weeks, graded_weeks = set(), set()
 
     for row in rows:
@@ -651,13 +657,26 @@ def analytics(conn=Depends(db)):
 
         rules.add_to_tally(by_slot[slot], result, margin)
         rules.add_to_tally(by_half["first" if slot <= 3 else "second"], result, margin)
+        side = rules.pick_side(pick["spread"])
+        rules.add_to_tally(by_side[side], result, margin)
         if player in by_player_slot:
             rules.add_to_tally(by_player_slot[player][slot], result, margin)
+            rules.add_to_tally(by_player_side[player][side], result, margin)
 
     for tally in by_slot.values():
         rules.finish_tally(tally)
     for tally in by_half.values():
         rules.finish_tally(tally)
+    for tally in by_side.values():
+        rules.finish_tally(tally)
+    for sides in by_player_side.values():
+        for tally in sides.values():
+            rules.finish_tally(tally)
+    # What share of a player's picks went each way -- the habit behind the record.
+    for player, sides in by_player_side.items():
+        total = sum(t["picks"] for t in sides.values())
+        for tally in sides.values():
+            tally["share"] = round(tally["picks"] / total, 3) if total else None
     for slots in by_player_slot.values():
         for tally in slots.values():
             rules.finish_tally(tally)
@@ -666,6 +685,10 @@ def analytics(conn=Depends(db)):
         "on_the_clock": _time_on_the_clock(rows),
         "by_slot": [by_slot[s] for s in sorted(by_slot)],
         "by_half": [by_half["first"], by_half["second"]],
+        "by_side": [by_side[side] for side in rules.SIDES],
+        "by_player_side": {p: [by_player_side[p][side] for side in rules.SIDES]
+                           for p in by_player_side},
+        "sides": list(rules.SIDES),
         "by_player_slot": {p: [by_player_slot[p][s] for s in sorted(by_player_slot[p])]
                            for p in by_player_slot},
         "players": rules.PLAYERS,

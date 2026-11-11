@@ -213,6 +213,18 @@ def format_duration(minutes: float | None) -> str:
     return f"{days}d" if not hours else f"{days}d {hours}h"
 
 
+SIDES = ("favorite", "underdog", "pickem")
+
+
+def pick_side(spread: float) -> str:
+    """Which way a pick leans: laying points, taking them, or neither."""
+    if spread < 0:
+        return "favorite"
+    if spread > 0:
+        return "underdog"
+    return "pickem"
+
+
 def new_tally(**labels) -> dict:
     """A blank record. `labels` identify what is being counted (a player, a slot)."""
     return {**labels, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "margin": 0.0}
@@ -229,6 +241,7 @@ def finish_tally(tally: dict) -> dict:
     decided = tally["wins"] + tally["losses"]
     graded = decided + tally["pushes"]
     tally["graded"] = graded
+    tally["picks"] = graded + tally["pending"]
     tally["win_pct"] = round(tally["wins"] / decided, 3) if decided else None
     tally["record"] = f"{tally['wins']}-{tally['losses']}" + (
         f"-{tally['pushes']}" if tally["pushes"] else ""
